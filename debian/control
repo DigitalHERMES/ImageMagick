@@ -1,0 +1,13 @@
+Source: imagemagick
+Section: graphics
+Priority: optional
+Maintainer: Rafael Diniz<rafael@rhizomatica.org>
+Build-Depends: debhelper-compat (= 12), dh-autoreconf
+Standards-Version: 4.5.0
+Homepage: https://www.imagemagick.org/
+
+Package: imagemagick
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Image manipulation programs
