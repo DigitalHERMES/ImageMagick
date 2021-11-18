@@ -33,12 +33,12 @@ m4_define([magick_git_revision],
           m4_esyscmd([
             c=$(git log --full-history --format=tformat:. HEAD | wc -l)
             h=$(git rev-parse --short HEAD)
-            d=$(date +%Y%m%d)
+            d=$(date -u +%Y%m%d)
             printf %s "$c:$h:$d"
           ]))
 m4_define([magick_release_date],
           m4_esyscmd([
-            d=$(date +%F -r ./ChangeLog)
+            d=$(date -u +%F -r ./ChangeLog)
             printf %s "$d"
           ]))
 
@@ -690,17 +690,6 @@ if test "$enable_pipes" = 'yes'; then
     MAGICK_FEATURES="Pipes $MAGICK_FEATURES"
 fi
 
-# Build a version of ImageMagick with assert statements.
-AC_ARG_ENABLE([assert],
-    [AC_HELP_STRING([--disable-assert],
-                    [disable assert() statements in build])],
-    [enable_assert=$enableval],
-    [enable_assert='yes'])
-
-if test "$enable_assert" = 'no'; then
-    AC_DEFINE([NDEBUG],[1],[Turn off assert statements])
-fi
-
 # Don't emit "rebuild rules" for configure, Makefile.ins, etc.
 AM_MAINTAINER_MODE
 
@@ -953,7 +942,7 @@ AC_HEADER_ASSERT
 AC_HEADER_DIRENT
 
 # Check additional headers
-AC_CHECK_HEADERS(arm/limits.h arpa/inet.h complex.h errno.h fcntl.h float.h limits.h linux/unistd.h locale.h machine/param.h mach-o/dyld.h malloc.h netdb.h netinet/in.h OS.h process.h sun_prefetch.h stdarg.h stddef.h sys/ipc.h sys/mman.h sys/resource.h sys/sendfile.h sys/socket.h sys/syslimits.h sys/time.h sys/timeb.h sys/times.h sys/uio.h sys/wait.h utime.h wchar.h xlocale.h)
+AC_CHECK_HEADERS(arm/limits.h arpa/inet.h complex.h errno.h fcntl.h float.h limits.h linux/unistd.h locale.h machine/param.h mach-o/dyld.h malloc.h netdb.h netinet/in.h OS.h process.h sun_prefetch.h stdarg.h stddef.h sys/ipc.h sys/mman.h sys/resource.h sys/sendfile.h sys/socket.h sys/syslimits.h sys/time.h sys/times.h sys/uio.h sys/wait.h utime.h wchar.h xlocale.h)
 
 ########
 #
@@ -2386,49 +2375,23 @@ AC_ARG_WITH([jxl],
     [with_jxl=$withval],
     [with_jxl='no'])
 
-if test "$with_jxl" != 'yes'; then
-    DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-jxl=$with_jxl "
-fi
-if test "$enable_static" = 'yes'; then
-    if test "$with_utilities" = 'yes'; then
-        with_jxl='no'
-    fi
-fi
-
 # Check for the JPEG-XL library.
 have_jxl='no'
+JXL_CFLAGS=''
 JXL_LIBS=''
+JXL_PKG=''
 if test "$with_jxl" != 'no'; then
   AC_MSG_RESULT([-------------------------------------------------------------])
-  AC_MSG_CHECKING([for jpeg-xl])
+  PKG_CHECK_MODULES([JXL],[libjxl >= 0.6 libjxl_threads],[have_jxl=yes],[have_jxl=no])
   AC_MSG_RESULT([])
-  failed=0
-  passed=0
-  AC_CHECK_HEADER([jxl/decode.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
-  AC_CHECK_HEADER([jxl/encode.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
-  # This check should be changed once we have a .pc file for the JPEG-XL library.
-  if test "$enable_static" != 'yes'; then
-    AC_CHECK_LIB([jxl],[JxlDecoderCreate],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`],[])
-    AC_CHECK_LIB([jxl],[JxlEncoderSetBasicInfo],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`],[])
-  fi
-
-  AC_MSG_CHECKING([if jpeg-xl package is complete])
-  if test $passed -gt 0; then
-      if test $failed -gt 0; then
-          AC_MSG_RESULT([no -- some components failed test])
-          have_jxl='no (failed tests)'
-      else
-          JXL_LIBS='-ljxl -ljxl_threads'
-          LIBS="$JXL_LIBS $LIBS"
-          AC_DEFINE([JXL_DELEGATE],[1],[Define if you have jpeg-xl library])
-          AC_MSG_RESULT([yes])
-          have_jxl='yes'
-      fi
-  else
-      AC_MSG_RESULT([no])
-  fi
 fi
+
+if test "$have_jxl" = 'yes'; then
+  AC_DEFINE([JXL_DELEGATE],[1],[Define if you have jpeg-xl library])
+fi
+
 AM_CONDITIONAL([JXL_DELEGATE],[test "$have_jxl" = 'yes'])
+AC_SUBST([JXL_CFLAGS])
 AC_SUBST([JXL_LIBS])
 
 dnl ===========================================================================
@@ -2978,7 +2941,7 @@ dnl ===========================================================================
 
 # Check for functions
 #
-AC_CHECK_FUNCS([acosh _aligned_malloc aligned_malloc asinh atanh atoll atexit cabs carg cimag creal clock clock_getres clock_gettime ctime_r directio erf _exit execvp fchmod floor fork ftime ftruncate getc_unlocked getcwd getpid getexecname getdtablesize getpagesize getpwnam_r getrlimit getrusage gettimeofday gmtime_r isnan j0 j1 lltostr localtime_r lstat memmove memset mkdir mkstemp munmap nanosleep newlocale _NSGetExecutablePath pclose _pclose poll popen _popen posix_fadvise posix_fallocate posix_madvise posix_memalign posix_spawnp pow pread putenv pwrite qsort_r raise rand_r readlink realpath select seekdir sendfile setlocale socket sqrt setvbuf stat strcasestr strchr strrchr strcspn strdup strpbrk strspn strstr strtod strtod_l strtol strtoul symlink sysconf sigemptyset sigaction spawnvp strerror strlcat strlcpy strcasecmp strncasecmp system telldir tempnam times ulltostr uselocale usleep utime vfprintf vfprintf_l vsprintf vsnprintf vsnprintf_l waitpid _wfopen _wstat])
+AC_CHECK_FUNCS([acosh _aligned_malloc aligned_malloc asinh atanh atoll atexit cabs carg cimag creal clock clock_getres clock_gettime ctime_r directio erf _exit execvp fchmod floor fork ftime ftruncate getc_unlocked getcwd getpid getexecname getdtablesize getpagesize getpwnam_r getrlimit getrusage gettimeofday gmtime_r isnan j0 j1 lltostr localtime_r lstat memmove memset mkdir mkstemp munmap nanosleep newlocale _NSGetExecutablePath pclose _pclose poll popen _popen posix_fadvise posix_fallocate posix_madvise posix_memalign posix_spawnp pow pread putenv pwrite qsort_r raise rand_r readlink realpath select seekdir sendfile setlocale socket sqrt setvbuf stat strcasestr strchr strrchr strcspn strdup strpbrk strspn strstr strtod strtod_l strtol strtoul symlink sysconf sigemptyset sigaction spawnvp strerror strlcat strlcpy strcasecmp strncasecmp system telldir tempnam times ulltostr uselocale usleep utime utimensat vfprintf vfprintf_l vsprintf vsnprintf vsnprintf_l waitpid _wfopen _wstat])
 
 # Substitute compiler name to build/link PerlMagick
 #

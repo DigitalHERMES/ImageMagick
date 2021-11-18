@@ -56,6 +56,7 @@
 #include "MagickCore/color-private.h"
 #include "MagickCore/colormap.h"
 #include "MagickCore/colormap-private.h"
+#include "MagickCore/colorspace-private.h"
 #include "MagickCore/exception.h"
 #include "MagickCore/exception-private.h"
 #include "MagickCore/image.h"
@@ -70,6 +71,7 @@
 #include "MagickCore/module.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/utility-private.h"
+#include "coders/coders-private.h"
 
 typedef struct
 {
@@ -607,23 +609,24 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   (void) SyncImage(image,exception);
 
 
-  /*detect monochrome image*/
-
-  if(palette==NULL)
-    {    /*attempt to detect binary (black&white) images*/
+  /* detect monochrome image */
+  if (palette == (Image *) NULL)
+    {
+      /* attempt to detect binary (black&white) images */
       if ((image->storage_class == PseudoClass) &&
-          (SetImageGray(image,exception) != MagickFalse))
+          (IdentifyImageCoderGray(image,exception) != MagickFalse))
         {
-          if(GetCutColors(image,exception)==2)
+          if (GetCutColors(image,exception) == 2)
             {
               for (i=0; i < (ssize_t)image->colors; i++)
                 {
                   Quantum
                     sample;
+
                   sample=ScaleCharToQuantum((unsigned char) i);
-                  if(image->colormap[i].red!=sample) goto Finish;
-                  if(image->colormap[i].green!=sample) goto Finish;
-                  if(image->colormap[i].blue!=sample) goto Finish;
+                  if (image->colormap[i].red!=sample) goto Finish;
+                  if (image->colormap[i].green!=sample) goto Finish;
+                  if (image->colormap[i].blue!=sample) goto Finish;
                 }
 
               image->colormap[1].red=image->colormap[1].green=

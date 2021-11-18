@@ -414,7 +414,8 @@ static HENHMETAFILE ReadEnhMetaFile(const char *path,ssize_t *width,
     }
   ReadFile(hFile,pBits,dwSize,&dwSize,NULL);
   CloseHandle(hFile);
-  if (((PAPMHEADER) pBits)->dwKey != 0x9ac6cdd7l)
+  if ((((PAPMHEADER) pBits)->dwKey != 0x9ac6cdd7l) ||
+      (((PAPMHEADER) pBits)->wInch == 0))
     {
       pBits=(BYTE *) DestroyString((char *) pBits);
       return((HENHMETAFILE) NULL);
@@ -746,10 +747,11 @@ static Image *ReadEMFImage(const ImageInfo *image_info,
   else if (image_info->density != (char *) NULL)
     {
       flags=ParseGeometry(image_info->density,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
       EMFSetDimensions(image,source);
     }
   if (SetImageExtent(image,image->columns,image->rows,exception) == MagickFalse)

@@ -57,6 +57,7 @@
 #include "MagickCore/list.h"
 #include "MagickCore/magick.h"
 #include "MagickCore/memory_.h"
+#include "MagickCore/module.h"
 #include "MagickCore/monitor.h"
 #include "MagickCore/monitor-private.h"
 #include "MagickCore/option.h"
@@ -65,7 +66,7 @@
 #include "MagickCore/quantum-private.h"
 #include "MagickCore/static.h"
 #include "MagickCore/string_.h"
-#include "MagickCore/module.h"
+#include "coders/coders-private.h"
 
 /*
   Enumerated declaractions.
@@ -257,10 +258,7 @@ static Image *ReadTGAImage(const ImageInfo *image_info,ExceptionInfo *exception)
     image->storage_class=PseudoClass;
   if ((tga_info.image_type == TGAMonochrome) ||
       (tga_info.image_type == TGARLEMonochrome))
-    {
-      image->type=GrayscaleType;
-      image->colorspace=GRAYColorspace;
-    }
+    (void) SetImageColorspace(image,GRAYColorspace,exception);
   image->compression=NoCompression;
   if ((tga_info.image_type == TGARLEColormap) ||
       (tga_info.image_type == TGARLEMonochrome) ||
@@ -728,23 +726,20 @@ static MagickBooleanType WriteTGAImage(const ImageInfo *image_info,Image *image,
   const double
     midpoint = QuantumRange/2.0;
 
+  const Quantum
+    *p;
+
   MagickBooleanType
     status;
 
   QuantumAny
     range;
 
-  const Quantum
-    *p;
-
   ssize_t
     x;
 
   ssize_t
     i;
-
-  unsigned char
-    *q;
 
   size_t
     channels;
@@ -757,6 +752,9 @@ static MagickBooleanType WriteTGAImage(const ImageInfo *image_info,Image *image,
 
   TGAInfo
     tga_info;
+
+  unsigned char
+    *q;
 
   /*
     Open output image file.
@@ -777,7 +775,8 @@ static MagickBooleanType WriteTGAImage(const ImageInfo *image_info,Image *image,
   */
   if ((image->columns > 65535L) || (image->rows > 65535L))
     ThrowWriterException(ImageError,"WidthOrHeightExceedsLimit");
-  (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   compression=image->compression;
   if (image_info->compression != UndefinedCompression)
     compression=image_info->compression;
@@ -800,7 +799,7 @@ static MagickBooleanType WriteTGAImage(const ImageInfo *image_info,Image *image,
       (image_info->type != TrueColorAlphaType) &&
       (image_info->type != PaletteType) &&
       (image->alpha_trait == UndefinedPixelTrait) &&
-      (SetImageGray(image,exception) != MagickFalse))
+      (IdentifyImageCoderGray(image,exception) != MagickFalse))
     tga_info.image_type=compression == RLECompression ? TGARLEMonochrome :
       TGAMonochrome;
   else

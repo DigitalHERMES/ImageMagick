@@ -361,35 +361,38 @@ static int ReadSingleWEBPImage(Image *image,const uint8_t *stream,
     (void) WebPMuxGetFeatures(mux,&webp_flags);
     if ((webp_flags & ICCP_FLAG) &&
         (WebPMuxGetChunk(mux,"ICCP",&chunk) == WEBP_MUX_OK))
-      {
-        profile=BlobToStringInfo(chunk.bytes,chunk.size);
-        if (profile != (StringInfo *) NULL)
-          {
-            SetImageProfile(image,"ICC",profile,exception);
-            profile=DestroyStringInfo(profile);
-          }
-      }
+      if (chunk.size != 0)
+        {
+          profile=BlobToStringInfo(chunk.bytes,chunk.size);
+          if (profile != (StringInfo *) NULL)
+            {
+              SetImageProfile(image,"ICC",profile,exception);
+              profile=DestroyStringInfo(profile);
+            }
+        }
     if ((webp_flags & EXIF_FLAG) &&
         (WebPMuxGetChunk(mux,"EXIF",&chunk) == WEBP_MUX_OK))
-      {
-        profile=BlobToStringInfo(chunk.bytes,chunk.size);
-        if (profile != (StringInfo *) NULL)
-          {
-            SetImageProfile(image,"EXIF",profile,exception);
-            profile=DestroyStringInfo(profile);
-          }
-      }
+      if (chunk.size != 0)
+        {
+          profile=BlobToStringInfo(chunk.bytes,chunk.size);
+          if (profile != (StringInfo *) NULL)
+            {
+              SetImageProfile(image,"EXIF",profile,exception);
+              profile=DestroyStringInfo(profile);
+            }
+        }
     if (((webp_flags & XMP_FLAG) &&
          (WebPMuxGetChunk(mux,"XMP ",&chunk) == WEBP_MUX_OK)) ||
          (WebPMuxGetChunk(mux,"XMP\0",&chunk) == WEBP_MUX_OK))
-      {
-        profile=BlobToStringInfo(chunk.bytes,chunk.size);
-        if (profile != (StringInfo *) NULL)
-          {
-            SetImageProfile(image,"XMP",profile,exception);
-            profile=DestroyStringInfo(profile);
-          }
-      }
+      if (chunk.size != 0)
+        {
+          profile=BlobToStringInfo(chunk.bytes,chunk.size);
+          if (profile != (StringInfo *) NULL)
+            {
+              SetImageProfile(image,"XMP",profile,exception);
+              profile=DestroyStringInfo(profile);
+            }
+        }
     WebPMuxDelete(mux);
   }
 #endif
@@ -757,7 +760,7 @@ static const char * WebPErrorCodeMessage(WebPEncodingError error_code)
   switch (error_code)
   {
     case VP8_ENC_OK:
-      return NULL;
+      return "";
     case VP8_ENC_ERROR_OUT_OF_MEMORY:
       return "out of memory";
     case VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY:
@@ -811,7 +814,8 @@ static MagickBooleanType WriteSingleWEBPPicture(const ImageInfo *image_info,
   /*
     Allocate memory for pixels.
   */
-  (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   *memory_info=AcquireVirtualMemory(image->columns,image->rows*
     sizeof(*(picture->argb)));
 
@@ -854,8 +858,7 @@ static MagickBooleanType WriteSingleWEBPPicture(const ImageInfo *image_info,
 
   if (status == MagickFalse)
     (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageError,
-      WebPErrorCodeMessage(picture->error_code),"`%s'",
-      image->filename);
+      WebPErrorCodeMessage(picture->error_code),"`%s'",image->filename);
 
   return(status);
 }
@@ -975,7 +978,7 @@ static MagickBooleanType WriteAnimatedWEBPImage(const ImageInfo *image_info,
 
   if (webp_status != 0)
     {
-      // add last null frame and assemble picture.
+      /* add last null frame and assemble picture. */
       webp_status=WebPAnimEncoderAdd(enc,(WebPPicture *) NULL,
         (int) frame_timestamp,configure);
       if (webp_status != 0)
@@ -1029,7 +1032,7 @@ static MagickBooleanType WriteWEBPImageProfile(Image *image,
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"UnableToEncodeImageFile","`%s'",image->filename);
 
-  // Clean up returned data
+  /* Clean up returned data */
   memset(webp_data, 0, sizeof(*webp_data));
   mux_error=WEBP_MUX_OK;
   if (image->iterations > 0)

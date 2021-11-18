@@ -2576,7 +2576,6 @@ MagickExport void ImagesToCustomStream(const ImageInfo *image_info,
   assert(images->signature == MagickCoreSignature);
   assert(image_info->custom_stream != (CustomStreamInfo *) NULL);
   assert(image_info->custom_stream->signature == MagickCoreSignature);
-  assert(image_info->custom_stream->reader != (CustomStreamHandler) NULL);
   assert(image_info->custom_stream->writer != (CustomStreamHandler) NULL);
   assert(exception != (ExceptionInfo *) NULL);
   clone_info=CloneImageInfo(image_info);
@@ -3191,7 +3190,7 @@ MagickExport void MSBOrderShort(unsigned char *p,const size_t length)
 */
 
 static inline MagickBooleanType SetStreamBuffering(const ImageInfo *image_info,
-  Image *image)
+  const BlobInfo *blob_info)
 {
   const char
     *option;
@@ -3206,7 +3205,7 @@ static inline MagickBooleanType SetStreamBuffering(const ImageInfo *image_info,
   option=GetImageOption(image_info,"stream:buffer-size");
   if (option != (const char *) NULL)
     size=StringToUnsignedLong(option);
-  status=setvbuf(image->blob->file_info.file,(char *) NULL,size == 0 ?
+  status=setvbuf(blob_info->file_info.file,(char *) NULL,size == 0 ?
     _IONBF : _IOFBF,size);
   return(status == 0 ? MagickTrue : MagickFalse);
 }
@@ -3296,17 +3295,17 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       blob_info->file_info.file=(*type == 'r') ? stdin : stdout;
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
       if (strchr(type,'b') != (char *) NULL)
-        setmode(fileno(blob_info->file_info.file),_O_BINARY);
+        (void) setmode(fileno(blob_info->file_info.file),_O_BINARY);
 #endif
       blob_info->type=StandardStream;
       blob_info->exempt=MagickTrue;
-      return(SetStreamBuffering(image_info,image));
+      return(SetStreamBuffering(image_info,blob_info));
     }
   if ((LocaleNCompare(filename,"fd:",3) == 0) &&
       (IsGeometry(filename+3) != MagickFalse))
     {
       char
-        fileMode[MagickPathExtent];
+        fileMode[2];
 
       *fileMode =(*type);
       fileMode[1]='\0';
@@ -3318,11 +3317,11 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
         }
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
       if (strchr(type,'b') != (char *) NULL)
-        setmode(fileno(blob_info->file_info.file),_O_BINARY);
+        (void) setmode(fileno(blob_info->file_info.file),_O_BINARY);
 #endif
       blob_info->type=FileStream;
       blob_info->exempt=MagickTrue;
-      return(SetStreamBuffering(image_info,image));
+      return(SetStreamBuffering(image_info,blob_info));
     }
 #if defined(MAGICKCORE_HAVE_POPEN) && defined(MAGICKCORE_PIPES_SUPPORT)
   if (*filename == '|')
@@ -3350,7 +3349,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
         }
       blob_info->type=PipeStream;
       blob_info->exempt=MagickTrue;
-      return(SetStreamBuffering(image_info,image));
+      return(SetStreamBuffering(image_info,blob_info));
     }
 #endif
   status=GetPathAttributes(filename,&blob_info->properties);
@@ -3365,7 +3364,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
         }
       blob_info->type=FileStream;
       blob_info->exempt=MagickTrue;
-      return(SetStreamBuffering(image_info,image));
+      return(SetStreamBuffering(image_info,blob_info));
     }
 #endif
   GetPathComponent(image->filename,ExtensionPath,extension);
@@ -3396,9 +3395,6 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
                   "%s-%.20g.%s",path,(double) image->scene,extension);
             }
           (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-#if defined(macintosh)
-          SetApplicationType(filename,image_info->magick,'8BIM');
-#endif
         }
     }
   if (image_info->file != (FILE *) NULL)
@@ -3420,7 +3416,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
               magick[3];
 
             blob_info->type=FileStream;
-            (void) SetStreamBuffering(image_info,image);
+            (void) SetStreamBuffering(image_info,blob_info);
             (void) memset(magick,0,sizeof(magick));
             count=fread(magick,1,sizeof(magick),blob_info->file_info.file);
             (void) fseek(blob_info->file_info.file,-((off_t) count),SEEK_CUR);
@@ -3497,37 +3493,37 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
                   }
               }
           }
+      }
+    else
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+      if ((LocaleCompare(extension,"Z") == 0) ||
+          (LocaleCompare(extension,"gz") == 0) ||
+          (LocaleCompare(extension,"wmz") == 0) ||
+          (LocaleCompare(extension,"svgz") == 0))
+        {
+          blob_info->file_info.gzfile=gzopen(filename,"wb");
+          if (blob_info->file_info.gzfile != (gzFile) NULL)
+            blob_info->type=ZipStream;
         }
       else
-#if defined(MAGICKCORE_ZLIB_DELEGATE)
-        if ((LocaleCompare(extension,"Z") == 0) ||
-            (LocaleCompare(extension,"gz") == 0) ||
-            (LocaleCompare(extension,"wmz") == 0) ||
-            (LocaleCompare(extension,"svgz") == 0))
+#endif
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+        if (LocaleCompare(extension,"bz2") == 0)
           {
-            blob_info->file_info.gzfile=gzopen(filename,"wb");
-            if (blob_info->file_info.gzfile != (gzFile) NULL)
-              blob_info->type=ZipStream;
+            blob_info->file_info.bzfile=BZ2_bzopen(filename,"w");
+            if (blob_info->file_info.bzfile != (BZFILE *) NULL)
+              blob_info->type=BZipStream;
           }
         else
 #endif
-#if defined(MAGICKCORE_BZLIB_DELEGATE)
-          if (LocaleCompare(extension,"bz2") == 0)
-            {
-              blob_info->file_info.bzfile=BZ2_bzopen(filename,"w");
-              if (blob_info->file_info.bzfile != (BZFILE *) NULL)
-                blob_info->type=BZipStream;
-            }
-          else
-#endif
-            {
-              blob_info->file_info.file=(FILE *) fopen_utf8(filename,type);
-              if (blob_info->file_info.file != (FILE *) NULL)
-                {
-                  blob_info->type=FileStream;
-                  (void) SetStreamBuffering(image_info,image);
-                }
-            }
+          {
+            blob_info->file_info.file=(FILE *) fopen_utf8(filename,type);
+            if (blob_info->file_info.file != (FILE *) NULL)
+              {
+                blob_info->type=FileStream;
+                (void) SetStreamBuffering(image_info,blob_info);
+              }
+          }
   blob_info->status=MagickFalse;
   blob_info->error_number=MagickFalse;
   if (blob_info->type != UndefinedStream)

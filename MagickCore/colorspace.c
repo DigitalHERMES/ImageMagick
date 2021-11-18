@@ -134,8 +134,7 @@ MagickExport ColorspaceType GetImageColorspaceType(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   colorspace=image->colorspace;
   type=IdentifyImageType(image,exception);
-  if ((type == BilevelType) || (type == GrayscaleType) ||
-      (type == GrayscaleAlphaType))
+  if (IsGrayImageType(type))
     colorspace=GRAYColorspace;
   return(colorspace);
 }
@@ -1557,21 +1556,19 @@ MagickExport MagickBooleanType SetImageGray(Image *image,
 MagickExport MagickBooleanType SetImageMonochrome(Image *image,
   ExceptionInfo *exception)
 {
-  const char
-    *value;
+  MagickBooleanType
+    is_bilevel;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (image->debug != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->type == BilevelType)
+  if (IsImageMonochrome(image) != MagickFalse)
     return(MagickTrue);
   if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
     return(MagickFalse);
-  value=GetImageProperty(image,"colorspace:auto-grayscale",exception);
-  if (IsStringFalse(value) != MagickFalse)
-    return(MagickFalse);
-  if (IdentifyImageMonochrome(image,exception) == MagickFalse)
+  is_bilevel=IdentifyImageMonochrome(image,exception);
+  if (is_bilevel == MagickFalse)
     return(MagickFalse);
   image->colorspace=GRAYColorspace;
   if (SyncImagePixelCache((Image *) image,exception) == MagickFalse)

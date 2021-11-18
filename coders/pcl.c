@@ -234,10 +234,11 @@ static Image *ReadPCLImage(const ImageInfo *image_info,ExceptionInfo *exception)
         flags;
 
       flags=ParseGeometry(PSDensityGeometry,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
     }
   /*
     Determine page geometry from the PCL media box.
@@ -734,7 +735,8 @@ static MagickBooleanType WritePCLImage(const ImageInfo *image_info,Image *image,
     /*
       Initialize the printer.
     */
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+    if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+      (void) TransformImageColorspace(image,sRGBColorspace,exception);
     (void) WriteBlobString(image,"\033E");  /* printer reset */
     (void) WriteBlobString(image,"\033*r3F");  /* set presentation mode */
     (void) FormatLocaleString(buffer,MagickPathExtent,"\033*r%.20gs%.20gT",

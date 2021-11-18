@@ -67,6 +67,7 @@
 #include "MagickCore/monitor-private.h"
 #include "MagickCore/option.h"
 #include "MagickCore/pixel-accessor.h"
+#include "MagickCore/policy.h"
 #include "MagickCore/property.h"
 #include "MagickCore/quantum-private.h"
 #include "MagickCore/resource_.h"
@@ -75,6 +76,7 @@
 #include "MagickCore/string-private.h"
 #include "MagickCore/token.h"
 #include "MagickCore/utility.h"
+#include "coders/coders-private.h"
 
 #if defined(MAGICKCORE_XML_DELEGATE)
 #  if defined(MAGICKCORE_WINDOWS_SUPPORT)
@@ -405,10 +407,6 @@ static Image *RenderRSVGImage(const ImageInfo *image_info,Image *image,
   PixelInfo
     fill_color;
 
-  ssize_t
-    x,
-    n;
-
   Quantum
     *q;
 
@@ -416,6 +414,8 @@ static Image *RenderRSVGImage(const ImageInfo *image_info,Image *image,
     *svg_handle;
 
   ssize_t
+    n,
+    x,
     y;
 
   unsigned char
@@ -470,16 +470,16 @@ static Image *RenderRSVGImage(const ImageInfo *image_info,Image *image,
       rsvg_handle_set_dpi_x_y(svg_handle,image->resolution.x*256,
         image->resolution.y*256);
       rsvg_handle_get_dimensions(svg_handle,&dpi_dimension_info);
-      if ((fabs(dpi_dimension_info.width-dimension_info.width) >= MagickEpsilon) ||
-          (fabs(dpi_dimension_info.height-dimension_info.height) >= MagickEpsilon))
+      if ((fabs((double) dpi_dimension_info.width-dimension_info.width) >= MagickEpsilon) ||
+          (fabs((double) dpi_dimension_info.height-dimension_info.height) >= MagickEpsilon))
         apply_density=MagickFalse;
       rsvg_handle_set_dpi_x_y(svg_handle,image->resolution.x,
         image->resolution.y);
     }
   if (image_info->size != (char *) NULL)
     {
-      (void) GetGeometry(image_info->size,(ssize_t *) NULL,
-        (ssize_t *) NULL,&image->columns,&image->rows);
+      (void) GetGeometry(image_info->size,(ssize_t *) NULL,(ssize_t *) NULL,
+        &image->columns,&image->rows);
       if ((image->columns != 0) || (image->rows != 0))
         {
           image->resolution.x=DefaultSVGDensity*image->columns/
@@ -3337,7 +3337,6 @@ static void SVGWarning(void *context,const char *format,...)
     DelegateWarning,reason,"`%s`",message);
   message=DestroyString(message);
   va_end(operands);
-  svg_info->parser->instate=XML_PARSER_EOF;
 }
 
 static void SVGError(void *,const char *,...)
@@ -3373,6 +3372,7 @@ static void SVGError(void *context,const char *format,...)
     reason,"`%s`",message);
   message=DestroyString(message);
   va_end(operands);
+  xmlStopParser(svg_info->parser);
 }
 
 static void SVGCDataBlock(void *context,const xmlChar *value,int length)
@@ -3474,7 +3474,8 @@ static void SVGExternalSubset(void *context,const xmlChar *name,
 }
 #endif
 
-static Image *ReadSVGImage(const ImageInfo *image_info,ExceptionInfo *exception)
+static Image *RenderMSVGImage(const ImageInfo *image_info,Image *image,
+  ExceptionInfo *exception)
 {
   char
     filename[MagickPathExtent];
@@ -3486,7 +3487,6 @@ static Image *ReadSVGImage(const ImageInfo *image_info,ExceptionInfo *exception)
     *file;
 
   Image
-    *image,
     *next;
 
   int
@@ -3508,61 +3508,6 @@ static Image *ReadSVGImage(const ImageInfo *image_info,ExceptionInfo *exception)
   xmlSAXHandlerPtr
     sax_handler;
 
-  /*
-    Open image file.
-  */
-  assert(image_info != (const ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (image_info->debug != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
-  assert(exception->signature == MagickCoreSignature);
-  image=AcquireImage(image_info,exception);
-  status=OpenBlob(image_info,image,ReadBinaryBlobMode,exception);
-  if (status == MagickFalse)
-    {
-      image=DestroyImageList(image);
-      return((Image *) NULL);
-    }
-  if ((fabs(image->resolution.x) < MagickEpsilon) ||
-      (fabs(image->resolution.y) < MagickEpsilon))
-    {
-      GeometryInfo
-        geometry_info;
-
-      int
-        flags;
-
-      flags=ParseGeometry(SVGDensityGeometry,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
-    }
-  if (LocaleCompare(image_info->magick,"MSVG") != 0)
-    {
-      Image
-        *svg_image;
-
-#if defined(MAGICKCORE_RSVG_DELEGATE)
-      if (LocaleCompare(image_info->magick,"RSVG") == 0)
-        {
-          svg_image=RenderRSVGImage(image_info,image,exception);
-          return(svg_image);
-        }
-#endif
-      svg_image=RenderSVGImage(image_info,image,exception);
-      if (svg_image != (Image *) NULL)
-        {
-          image=DestroyImageList(image);
-          return(svg_image);
-        }
-#if defined(MAGICKCORE_RSVG_DELEGATE)
-      svg_image=RenderRSVGImage(image_info,image,exception);
-      return(svg_image);
-#endif
-    }
   /*
     Open draw file.
   */
@@ -3716,15 +3661,27 @@ static Image *ReadSVGImage(const ImageInfo *image_info,ExceptionInfo *exception)
   return(GetFirstImageInList(image));
 }
 #else
+static Image *RenderMSVGImage(const ImageInfo *magick_unused(image_info),
+  Image *image,ExceptionInfo *magick_unused(exception))
+{
+  magick_unreferenced(image_info);
+  magick_unreferenced(exception);
+  image=DestroyImageList(image);
+  return((Image *) NULL);
+}
+#endif
+
 static Image *ReadSVGImage(const ImageInfo *image_info,ExceptionInfo *exception)
 {
   Image
-    *image,
-    *svg_image;
+    *image;
 
   MagickBooleanType
     status;
 
+  /*
+    Open image file.
+  */
   assert(image_info != (const ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -3749,16 +3706,42 @@ static Image *ReadSVGImage(const ImageInfo *image_info,ExceptionInfo *exception)
         flags;
 
       flags=ParseGeometry(SVGDensityGeometry,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
     }
-  svg_image=RenderSVGImage(image_info,image,exception);
-  image=DestroyImage(image);
-  return(svg_image);
-}
+  if (LocaleCompare(image_info->magick,"MSVG") != 0)
+    {
+      Image
+        *svg_image;
+
+#if defined(MAGICKCORE_RSVG_DELEGATE)
+      if (LocaleCompare(image_info->magick,"RSVG") == 0)
+        {
+          image=RenderRSVGImage(image_info,image,exception);
+          return(image);
+        }
 #endif
+      svg_image=RenderSVGImage(image_info,image,exception);
+      if (svg_image != (Image *) NULL)
+        {
+          image=DestroyImageList(image);
+          return(svg_image);
+        }
+#if defined(MAGICKCORE_RSVG_DELEGATE)
+      image=RenderRSVGImage(image_info,image,exception);
+      return(image);
+#endif
+    }
+  status=IsRightsAuthorized(CoderPolicyDomain,ReadPolicyRights,"MSVG");
+  if (status == MagickFalse)
+    image=DestroyImageList(image);
+  else
+    image=RenderMSVGImage(image_info,image,exception);
+  return(image);
+}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3997,9 +3980,6 @@ static MagickBooleanType TraceSVGImage(Image *image,ExceptionInfo *exception)
     at_splines_type
       *splines;
 
-    ImageType
-      type;
-
     const Quantum
       *p;
 
@@ -4018,10 +3998,8 @@ static MagickBooleanType TraceSVGImage(Image *image,ExceptionInfo *exception)
     */
     fitting_options=at_fitting_opts_new();
     output_options=at_output_opts_new();
-    (void) SetImageGray(image,exception);
-    type=GetImageType(image);
     number_planes=3;
-    if ((type == BilevelType) || (type == GrayscaleType))
+    if (IdentifyImageCoderGray(image,exception) != MagickFalse)
       number_planes=1;
     trace=at_bitmap_new(image->columns,image->rows,number_planes);
     i=0;

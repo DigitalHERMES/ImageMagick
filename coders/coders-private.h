@@ -16,6 +16,11 @@
 #ifndef MAGICK_CODERS_PRIVATE_H
 #define MAGICK_CODERS_PRIVATE_H
 
+#include "MagickCore/attribute.h"
+#include "MagickCore/colorspace-private.h"
+#include "MagickCore/property.h"
+#include "MagickCore/string_.h"
+
 #define MagickCoderHeader(coder,offset,magic)  { coder, offset, \
   (const unsigned char *) (magic), sizeof(magic)-1 },
 
@@ -26,5 +31,39 @@ extern ModuleExport size_t \
   Register ## coder ## Image(void); \
 extern ModuleExport void \
   Unregister ## coder ## Image(void);
+
+static inline ImageType IdentifyImageCoderType(const Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *value;
+
+  value=GetImageProperty(image,"colorspace:auto-grayscale",exception);
+  if (IsStringFalse(value) != MagickFalse)
+    return(image->type);
+  return(IdentifyImageType(image,exception));
+}
+
+static inline ImageType IdentifyImageCoderGrayType(const Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *value;
+
+  value=GetImageProperty(image,"colorspace:auto-grayscale",exception);
+  if (IsStringFalse(value) != MagickFalse)
+    return(UndefinedType);
+  return(IdentifyImageGray(image,exception));
+}
+
+static inline MagickBooleanType IdentifyImageCoderGray(const Image *image,
+  ExceptionInfo *exception)
+{
+  ImageType
+    type;
+
+  type=IdentifyImageCoderGrayType(image,exception);
+  return(IsGrayImageType(type));
+}
 
 #endif

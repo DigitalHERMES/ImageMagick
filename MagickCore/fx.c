@@ -521,13 +521,16 @@ static inline MagickBooleanType IsFxFunction(const char *expression,
   return(MagickFalse);
 }
 
-static inline double FxGCD(const double alpha,const double beta)
+static inline double FxGCD(const double alpha,const double beta,
+  const size_t depth)
 {
-  if (alpha < beta) 
-    return(FxGCD(beta,alpha)); 
-  if (fabs(beta) < 0.001) 
-    return(alpha); 
-  return(FxGCD(beta,alpha-beta*floor(alpha/beta))); 
+#define FxMaxFunctionDepth  200
+
+  if (alpha < beta)
+    return(FxGCD(beta,alpha,depth+1));
+  if ((fabs(beta) < 0.001) || (depth >= FxMaxFunctionDepth))
+    return(alpha);
+  return(FxGCD(beta,alpha-beta*floor(alpha/beta),depth+1));
 }
 
 static inline const char *FxSubexpression(const char *expression,
@@ -756,9 +759,6 @@ static double FxGetSymbol(FxInfo *fx_info,const PixelChannel channel,
             }
           else
             {
-              MagickBooleanType
-                status;
-
               status=QueryColorCompliance(name,AllCompliance,&pixel,
                 fx_info->exception);
               if (status != MagickFalse)
@@ -2238,9 +2238,6 @@ static double FxEvaluateSubexpression(FxInfo *fx_info,
         }
       if (IsFxFunction(expression,"for",3) != MagickFalse)
         {
-          double
-            sans = 0.0;
-
           size_t
             length;
 
@@ -2285,9 +2282,9 @@ static double FxEvaluateSubexpression(FxInfo *fx_info,
 
           alpha=FxEvaluateSubexpression(fx_info,channel,x,y,expression+3,
             depth+1,beta,exception);
-          if (IsNaN(alpha))
+          if (IsNaN(alpha) != 0)
             FxReturn(alpha);
-          gcd=FxGCD(alpha,*beta);
+          gcd=FxGCD(alpha,*beta,0);
           FxReturn(gcd);
         }
       if (LocaleCompare(expression,"g") == 0)
@@ -2321,9 +2318,6 @@ static double FxEvaluateSubexpression(FxInfo *fx_info,
     {
       if (IsFxFunction(expression,"if",2) != MagickFalse)
         {
-          double
-            sans = 0.0;
-
           size_t
             length;
 

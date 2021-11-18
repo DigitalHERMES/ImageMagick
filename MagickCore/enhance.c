@@ -1563,6 +1563,9 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     *stretch_map,
     *white;
 
+  ImageType
+    type;
+
   MagickBooleanType
     status;
 
@@ -1582,7 +1585,8 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (image->debug != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageGray(image,exception) != MagickFalse)
+  type=IdentifyImageType(image,exception);
+  if (IsGrayImageType(type) != MagickFalse)
     (void) SetImageColorspace(image,GRAYColorspace,exception);
   black=(double *) AcquireQuantumMemory(MaxPixelChannels,sizeof(*black));
   white=(double *) AcquireQuantumMemory(MaxPixelChannels,sizeof(*white));
@@ -3633,9 +3637,9 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     *artifact;
 
   double
-    percent_brightness,
-    percent_hue,
-    percent_saturation;
+    percent_brightness = 100.0,
+    percent_hue = 100.0,
+    percent_saturation = 100.0;
 
   GeometryInfo
     geometry_info;
@@ -3670,13 +3674,12 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
   flags=ParseGeometry(modulate,&geometry_info);
-  percent_brightness=geometry_info.rho;
-  percent_saturation=geometry_info.sigma;
-  if ((flags & SigmaValue) == 0)
-    percent_saturation=100.0;
-  percent_hue=geometry_info.xi;
-  if ((flags & XiValue) == 0)
-    percent_hue=100.0;
+  if ((flags & RhoValue) != 0)
+    percent_brightness=geometry_info.rho;
+  if ((flags & SigmaValue) != 0)
+    percent_saturation=geometry_info.sigma;
+  if ((flags & XiValue) != 0)
+    percent_hue=geometry_info.xi;
   artifact=GetImageArtifact(image,"modulate:colorspace");
   if (artifact != (const char *) NULL)
     {
@@ -4533,7 +4536,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
         channel_mask;
 
       double
-        black_point;
+        black_point = 0.0;
 
       GeometryInfo
         geometry_info;
@@ -4545,7 +4548,8 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
         Level the a & b channels.
       */
       flags=ParseGeometry(artifact,&geometry_info);
-      black_point=geometry_info.rho;
+      if ((flags & RhoValue) != 0)
+        black_point=geometry_info.rho;
       if ((flags & PercentValue) != 0)
         black_point*=(double) (QuantumRange/100.0);
       channel_mask=SetImageChannelMask(image,(ChannelType) (aChannel |

@@ -56,6 +56,7 @@
 #include "MagickCore/list.h"
 #include "MagickCore/magick.h"
 #include "MagickCore/memory_.h"
+#include "MagickCore/module.h"
 #include "MagickCore/monitor.h"
 #include "MagickCore/monitor-private.h"
 #include "MagickCore/pixel-accessor.h"
@@ -63,7 +64,7 @@
 #include "MagickCore/quantum-private.h"
 #include "MagickCore/static.h"
 #include "MagickCore/string_.h"
-#include "MagickCore/module.h"
+#include "coders/coders-private.h"
 
 /*
   Typedef declaractions.
@@ -930,9 +931,6 @@ static MagickBooleanType WriteSGIImage(const ImageInfo *image_info,Image *image,
     i,
     x;
 
-  unsigned char
-    *q;
-
   size_t
     imageListLength;
 
@@ -967,7 +965,8 @@ static MagickBooleanType WriteSGIImage(const ImageInfo *image_info,Image *image,
     */
     if ((image->columns > 65535UL) || (image->rows > 65535UL))
       ThrowWriterException(ImageError,"WidthOrHeightExceedsLimit");
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+    if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+      (void) TransformImageColorspace(image,sRGBColorspace,exception);
     (void) memset(&iris_info,0,sizeof(iris_info));
     iris_info.magic=0x01DA;
     compression=image->compression;
@@ -988,7 +987,7 @@ static MagickBooleanType WriteSGIImage(const ImageInfo *image_info,Image *image,
     else
       {
         if ((image_info->type != TrueColorType) &&
-            (SetImageGray(image,exception) != MagickFalse))
+            (IdentifyImageCoderGray(image,exception) != MagickFalse))
           {
             iris_info.dimension=2;
             iris_info.depth=1;
@@ -1124,6 +1123,9 @@ static MagickBooleanType WriteSGIImage(const ImageInfo *image_info,Image *image,
         ssize_t
           offset,
           *offsets;
+
+        unsigned char
+          *q;
 
         /*
           Convert SGI uncompressed pixels.

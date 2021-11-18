@@ -1383,10 +1383,11 @@ static MagickBooleanType DrawBoundingRectangles(Image *image,
         flags;
 
       flags=ParseGeometry(clone_info->density,&geometry_info);
-      resolution.x=geometry_info.rho;
-      resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == MagickFalse)
-        resolution.y=resolution.x;
+      if ((flags & RhoValue) != 0)
+        resolution.x=geometry_info.rho;
+      resolution.y=resolution.x;
+      if ((flags & SigmaValue) != 0)
+        resolution.y=geometry_info.sigma;
     }
   mid=(resolution.x/96.0)*ExpandAffine(&clone_info->affine)*
     clone_info->stroke_width/2.0;
@@ -3457,33 +3458,33 @@ static MagickBooleanType RenderMVGContent(Image *image,
                   name[MagickPathExtent];
 
                 RectangleInfo
-                  bounds;
+                  region;
 
                 (void) GetNextToken(q,&q,extent,token);
                 (void) CopyMagickString(name,token,MagickPathExtent);
                 (void) GetNextToken(q,&q,extent,token);
-                bounds.x=CastDoubleToLong(ceil(GetDrawValue(token,
+                region.x=CastDoubleToLong(ceil(GetDrawValue(token,
                   &next_token)-0.5));
                 if (token == next_token)
                   ThrowPointExpectedException(token,exception);
                 (void) GetNextToken(q,&q,extent,token);
                 if (*token == ',')
                   (void) GetNextToken(q,&q,extent,token);
-                bounds.y=CastDoubleToLong(ceil(GetDrawValue(token,
+                region.y=CastDoubleToLong(ceil(GetDrawValue(token,
                   &next_token)-0.5));
                 if (token == next_token)
                   ThrowPointExpectedException(token,exception);
                 (void) GetNextToken(q,&q,extent,token);
                 if (*token == ',')
                   (void) GetNextToken(q,&q,extent,token);
-                bounds.width=(size_t) CastDoubleToLong(floor(GetDrawValue(
+                region.width=(size_t) CastDoubleToLong(floor(GetDrawValue(
                   token,&next_token)+0.5));
                 if (token == next_token)
                   ThrowPointExpectedException(token,exception);
                 (void) GetNextToken(q,&q,extent,token);
                 if (*token == ',')
                   (void) GetNextToken(q,&q,extent,token);
-                bounds.height=(size_t) floor(GetDrawValue(token,&next_token)+
+                region.height=(size_t) floor(GetDrawValue(token,&next_token)+
                   0.5);
                 if (token == next_token)
                   ThrowPointExpectedException(token,exception);
@@ -3509,8 +3510,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
                 (void) FormatLocaleString(key,MagickPathExtent,"%s-geometry",
                   name);
                 (void) FormatLocaleString(geometry,MagickPathExtent,
-                  "%.20gx%.20g%+.20g%+.20g",(double) bounds.width,(double)
-                  bounds.height,(double) bounds.x,(double) bounds.y);
+                  "%.20gx%.20g%+.20g%+.20g",(double) region.width,(double)
+                  region.height,(double) region.x,(double) region.y);
                 (void) SetImageArtifact(image,key,geometry);
                 (void) GetNextToken(q,&q,extent,token);
                 break;
@@ -4323,9 +4324,6 @@ static MagickBooleanType RenderMVGContent(Image *image,
       }
       case TextPrimitive:
       {
-        char
-          geometry[MagickPathExtent];
-
         if (primitive_info[j].coordinates != 1)
           {
             status=MagickFalse;
@@ -4349,8 +4347,6 @@ static MagickBooleanType RenderMVGContent(Image *image,
             mvg_info.point=primitive_info->point;
             cursor=0.0;
           }
-        (void) FormatLocaleString(geometry,MagickPathExtent,"%+f%+f",
-          primitive_info->point.x,primitive_info->point.y);
         clone_info->render=MagickFalse;
         clone_info->text=AcquireString(token);
         status&=GetTypeMetrics(image,clone_info,&metrics,exception);
@@ -5680,8 +5676,8 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
            (draw_info->stroke_pattern != (Image *) NULL)))
         {
           double
-            x,
-            y;
+            point_x,
+            point_y;
 
           MagickBooleanType
             closed_path;
@@ -5691,9 +5687,9 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
           */
           closed_path=primitive_info[0].closed_subpath;
           i=(ssize_t) primitive_info[0].coordinates;
-          x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
-          y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
-          if ((x < MagickEpsilon) && (y < MagickEpsilon))
+          point_x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
+          point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
+          if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
             closed_path=MagickTrue;
           if ((((draw_info->linecap == RoundCap) ||
                 (closed_path != MagickFalse)) &&
@@ -7470,7 +7466,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
           box_q[3].y)/(slope.p-slope.q));
         box_q[4].y=(double) (slope.p*(box_q[4].x-box_q[0].x)+box_q[0].y);
       }
+    DisableMSCWarning(4127)
     CheckPathExtent(MaxStrokePad,MaxStrokePad);
+    RestoreMSCWarning
     dot_product=dx.q*dy.p-dx.p*dy.q;
     if (dot_product <= 0.0)
       switch (draw_info->linejoin)
@@ -7526,7 +7524,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
             theta.q+=2.0*MagickPI;
           arc_segments=(size_t) CastDoubleToLong(ceil((double) ((theta.
             q-theta.p)/(2.0*sqrt(PerceptibleReciprocal(mid))))));
+          DisableMSCWarning(4127)
           CheckPathExtent(MaxStrokePad,arc_segments+MaxStrokePad);
+          RestoreMSCWarning
           stroke_q[q].x=box_q[1].x;
           stroke_q[q].y=box_q[1].y;
           q++;
@@ -7599,7 +7599,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
             theta.p+=2.0*MagickPI;
           arc_segments=(size_t) CastDoubleToLong(ceil((double) ((theta.p-
             theta.q)/(2.0*sqrt((double) (PerceptibleReciprocal(mid)))))));
+          DisableMSCWarning(4127)
           CheckPathExtent(arc_segments+MaxStrokePad,MaxStrokePad);
+          RestoreMSCWarning
           stroke_p[p++]=box_p[1];
           for (j=1; j < (ssize_t) arc_segments; j++)
           {

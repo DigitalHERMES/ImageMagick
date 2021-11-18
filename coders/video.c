@@ -575,6 +575,7 @@ static MagickBooleanType WriteVIDEOImage(const ImageInfo *image_info,
     basename);
   count=0;
   write_info=CloneImageInfo(image_info);
+  write_info->file=(FILE *) NULL;
   *write_info->magick='\0';
   status=MagickTrue;
   for (p=coalesce_image; p != (Image *) NULL; p=GetNextImageInList(p))
@@ -690,13 +691,14 @@ static MagickBooleanType WriteVIDEOImage(const ImageInfo *image_info,
           (void) FormatLocaleString(filename,MagickPathExtent,"%s.%s",
             write_info->unique,image_info->magick);
           status=CopyDelegateFile(filename,image->filename);
+          (void) RelinquishUniqueFileResource(filename);
         }
       else if (*message != '\0')
         {
           (void) ThrowMagickException(exception,GetMagickModule(),
             DelegateError,"VideoDelegateFailed","`%s'",message);
         }
-      (void) RelinquishUniqueFileResource(filename);
+      (void) RelinquishUniqueFileResource(write_info->unique);
   }
   write_info=DestroyImageInfo(write_info);
   /*

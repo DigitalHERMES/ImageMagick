@@ -587,7 +587,7 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
         c;
 
       char
-        *p;
+        *r;
 
       size_t
         length;
@@ -595,9 +595,6 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
       num_pad_bytes = (size_t) (comment_offset - TellBlob( image ));
       while (num_pad_bytes-- != 0)
       {
-        int
-          c;
-
         c=ReadBlobByte(image);
         if (c == EOF)
           break;
@@ -609,23 +606,23 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
       c=ReadBlobByte(image);
       length=MagickPathExtent;
       comment=AcquireString((char *) NULL);
-      for (p=comment; c != EOF; p++)
+      for (r=comment; c != EOF; r++)
       {
-        if ((size_t) (p-comment+MagickPathExtent) >= length)
+        if ((size_t) (r-comment+MagickPathExtent) >= length)
           {
-            *p='\0';
+            *r='\0';
             length<<=1;
             length+=MagickPathExtent;
             comment=(char *) ResizeQuantumMemory(comment,length+
               MagickPathExtent,sizeof(*comment));
             if (comment == (char *) NULL)
               break;
-            p=comment+strlen(comment);
+            r=comment+strlen(comment);
           }
-        *p=c;
+        *r=c;
         c=ReadBlobByte(image);
       }
-      *p='\0';
+      *r='\0';
       if (comment == (char *) NULL)
         ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
       (void) SetImageProperty(image,"comment",comment,exception);
@@ -800,7 +797,8 @@ static MagickBooleanType WritePDBImage(const ImageInfo *image_info,Image *image,
   status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
   if (status == MagickFalse)
     return(status);
-  (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   if (SetImageMonochrome(image,exception) != MagickFalse) {
     bits_per_pixel=1;
   } else if (image->colors <= 4) {
@@ -883,7 +881,8 @@ static MagickBooleanType WritePDBImage(const ImageInfo *image_info,Image *image,
   (void) memset(buffer,0,512*sizeof(*buffer));
   (void) memset(scanline,0,image->columns*packet_size*sizeof(*scanline));
   if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+    if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+      (void) TransformImageColorspace(image,sRGBColorspace,exception);
   /*
     Convert to GRAY raster scanline.
   */

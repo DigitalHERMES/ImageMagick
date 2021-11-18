@@ -655,11 +655,11 @@ static double Welch(const double x,
 %  crossing is at (36 sqrt(2) + 123)/(72 sqrt(2) + 47), almost the same as the
 %  first crossing of Mitchell and Lanczos2Sharp.
 %
-%  RodidouxSharp is a slightly sharper version of Rodidoux, some believe it
+%  RobidouxSharp is a slightly sharper version of Robidoux, some believe it
 %  is too sharp.  It is designed to minimize the maximum possible change in
 %  a pixel value which is at one of the extremes (e.g., 0 or 255) under no-op
-%  conditions.  Amazingly Mitchell falls roughly between Rodidoux and
-%  RodidouxSharp, though this seems to have been pure coincidence.
+%  conditions.  Amazingly Mitchell falls roughly between Robidoux and
+%  RobidouxSharp, though this seems to have been pure coincidence.
 %
 %  'EXPERT' OPTIONS:
 %
@@ -2401,14 +2401,14 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   { \
     if (intensities[B] > intensities[A]) \
       { \
-        ssize_t    \
+        const ssize_t    \
           offsets[3] = { B, C, D }; \
  \
         MixPixels(pixels,offsets,3,result,3,channels); \
       } \
     else \
       { \
-        ssize_t    \
+        const ssize_t    \
           offsets[3] = { A, B, C }; \
  \
         MixPixels(pixels,offsets,3,result,3,channels); \
@@ -2423,6 +2423,9 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
       Mix2Pixels(pixels,A,B,result,3,channels); \
   }
 
+  const ssize_t
+    pixels_offsets[4] = { 0, 1, 3, 4 };
+
   MagickFloatType
     intensities[9];
 
@@ -2436,9 +2439,6 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
 
   ssize_t
     i;
-
-  ssize_t
-    offsets[4] = { 0, 1, 3, 4 };
 
   for (i=0; i < 9; i++)
     intensities[i]=GetPixelIntensity(source,pixels + i*channels);
@@ -2508,7 +2508,7 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
       Line(1,4,0,3)
       return;
     }
-  MixPixels(pixels,offsets,4,result,3,channels);
+  MixPixels(pixels,pixels_offsets,4,result,3,channels);
 #undef Corner
 #undef Line
 }

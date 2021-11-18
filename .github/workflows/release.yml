@@ -75,8 +75,7 @@ jobs:
       run: |
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         cd %GITHUB_WORKSPACE%\ImageMagick-Windows\VisualMagick\configure
-        devenv /upgrade configure.vcxproj
-        msbuild configure.sln /m /t:Rebuild /p:Configuration=Release,Platform=Win32
+        msbuild configure.2019.sln /m /t:Rebuild /p:Configuration=Release,Platform=Win32
 
     - name: Configure ImageMagick
       shell: cmd
@@ -121,7 +120,7 @@ jobs:
       with:
         certificate: '${{ secrets.CERTIFICATE }}'
         folder: 'ImageMagick-Windows\VisualMagick\installer\output'
-  
+
     - uses: actions/upload-artifact@v2
       with:
         name: installers
@@ -150,7 +149,7 @@ jobs:
       run: |
         cd %GITHUB_WORKSPACE%\ImageMagick-Windows
         7z a ImageMagick-Windows.7z .\source\*
-  
+
     - uses: actions/upload-artifact@v2
       with:
         name: ImageMagick-Windows
@@ -204,8 +203,7 @@ jobs:
       run: |
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         cd %GITHUB_WORKSPACE%\ImageMagick-Windows\VisualMagick\configure
-        devenv /upgrade configure.vcxproj
-        msbuild configure.sln /m /t:Rebuild /p:Configuration=Release,Platform=Win32
+        msbuild configure.2019.sln /m /t:Rebuild /p:Configuration=Release,Platform=Win32
 
     - name: Configure ImageMagick
       shell: cmd

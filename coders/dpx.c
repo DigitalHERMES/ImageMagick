@@ -67,6 +67,7 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/string-private.h"
 #include "MagickCore/timer-private.h"
+#include "coders/coders-private.h"
 
 /*
   Define declaration.
@@ -1243,6 +1244,7 @@ static Image *ReadDPXImage(const ImageInfo *image_info,ExceptionInfo *exception)
     SetQuantumQuantum(quantum_info,32);
     SetQuantumPack(quantum_info,dpx.image.image_element[n].packing == 0 ?
       MagickTrue : MagickFalse);
+    status=SetQuantumPad(image,quantum_info,0);
     pixels=GetQuantumPixels(quantum_info);
     for (y=0; y < (ssize_t) image->rows; y++)
     {
@@ -1524,10 +1526,11 @@ static MagickBooleanType WriteDPXImage(const ImageInfo *image_info,Image *image,
   if (image_info->sampling_factor != (char *) NULL)
     {
       flags=ParseGeometry(image_info->sampling_factor,&geometry_info);
-      horizontal_factor=(ssize_t) geometry_info.rho;
-      vertical_factor=(ssize_t) geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        vertical_factor=horizontal_factor;
+      if ((flags & RhoValue) != 0)
+        horizontal_factor=(ssize_t) geometry_info.rho;
+      vertical_factor=horizontal_factor;
+      if ((flags & SigmaValue) != 0)
+        vertical_factor=(ssize_t) geometry_info.sigma;
       if ((horizontal_factor != 1) && (horizontal_factor != 2) &&
           (horizontal_factor != 4) && (vertical_factor != 1) &&
           (vertical_factor != 2) && (vertical_factor != 4))
@@ -1669,7 +1672,7 @@ static MagickBooleanType WriteDPXImage(const ImageInfo *image_info,Image *image,
             dpx.image.image_element[i].descriptor=RGBAComponentType;
           if ((image_info->type != TrueColorType) &&
               (image->alpha_trait == UndefinedPixelTrait) &&
-              (SetImageGray(image,exception) != MagickFalse))
+              (IdentifyImageCoderGray(image,exception) != MagickFalse))
             dpx.image.image_element[i].descriptor=LumaComponentType;
           break;
         }

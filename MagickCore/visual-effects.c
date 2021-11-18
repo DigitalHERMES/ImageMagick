@@ -846,26 +846,26 @@ MagickExport Image *ColorMatrixImage(const Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       ssize_t
-        v;
+        h;
 
       size_t
         height;
 
       GetPixelInfoPixel(image,p,&pixel);
       height=color_matrix->height > 6 ? 6UL : color_matrix->height;
-      for (v=0; v < (ssize_t) height; v++)
+      for (h=0; h < (ssize_t) height; h++)
       {
         double
           sum;
 
-        sum=ColorMatrix[v][0]*GetPixelRed(image,p)+ColorMatrix[v][1]*
-          GetPixelGreen(image,p)+ColorMatrix[v][2]*GetPixelBlue(image,p);
+        sum=ColorMatrix[h][0]*GetPixelRed(image,p)+ColorMatrix[h][1]*
+          GetPixelGreen(image,p)+ColorMatrix[h][2]*GetPixelBlue(image,p);
         if (image->colorspace == CMYKColorspace)
-          sum+=ColorMatrix[v][3]*GetPixelBlack(image,p);
+          sum+=ColorMatrix[h][3]*GetPixelBlack(image,p);
         if (image->alpha_trait != UndefinedPixelTrait)
-          sum+=ColorMatrix[v][4]*GetPixelAlpha(image,p);
-        sum+=QuantumRange*ColorMatrix[v][5];
-        switch (v)
+          sum+=ColorMatrix[h][4]*GetPixelAlpha(image,p);
+        sum+=QuantumRange*ColorMatrix[h][5];
+        switch (h)
         {
           case 0: pixel.red=sum; break;
           case 1: pixel.green=sum; break;
@@ -3639,8 +3639,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
         magnitude;
 
       ssize_t
-        x,
-        y;
+        x;
 
       low_pass=(size_t) (number_pixels*((level & 0x01)+1));
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -3657,13 +3656,13 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
           *magick_restrict q;
 
         ssize_t
-          x;
+          c;
 
         p=kernel+id*image->columns;
         q=pixels+y*image->columns;
-        HatTransform(q+high_pass,1,image->columns,(size_t) (1UL << level),p);
+        HatTransform(q+high_pass,1,image->columns,((size_t) 1UL << level),p);
         q+=low_pass;
-        for (x=0; x < (ssize_t) image->columns; x++)
+        for (c=0; c < (ssize_t) image->columns; c++)
           *q++=(*p++);
       }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -3680,12 +3679,12 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
           *magick_restrict q;
 
         ssize_t
-          y;
+          r;
 
         p=kernel+id*image->rows;
         q=pixels+x+low_pass;
-        HatTransform(q,image->columns,image->rows,(size_t) (1UL << level),p);
-        for (y=0; y < (ssize_t) image->rows; y++)
+        HatTransform(q,image->columns,image->rows,((size_t) 1UL << level),p);
+        for (r=0; r < (ssize_t) image->rows; r++)
         {
           *q=(*p++);
           q+=image->columns;

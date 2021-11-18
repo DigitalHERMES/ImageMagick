@@ -1500,7 +1500,10 @@ WandExport MagickBooleanType DisplayImageCommand(ImageInfo *image_info,
             if (i == (ssize_t) argc)
               ThrowDisplayException(OptionError,"MissingArgument",option);
             if (XRemoteCommand(display,resource_info.window_id,argv[i]) != 0)
-              return(MagickFalse);
+              {
+                DestroyDisplay();
+                return(MagickFalse);
+              }
             i--;
             break;
           }
@@ -1860,7 +1863,10 @@ WandExport MagickBooleanType DisplayImageCommand(ImageInfo *image_info,
                 p=fgets(answer,(int) sizeof(answer),stdin);
                 (void) p;
                 if (((*answer != 'y') && (*answer != 'Y')))
-                  return(MagickFalse);
+                  {
+                    DestroyDisplay();
+                    return(MagickFalse);
+                  }
               }
             break;
           }

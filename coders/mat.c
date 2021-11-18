@@ -77,6 +77,7 @@
 #include "MagickCore/timer-private.h"
 #include "MagickCore/transform.h"
 #include "MagickCore/utility-private.h"
+#include "coders/coders-private.h"
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
  #include "zlib.h"
 #endif
@@ -1660,8 +1661,9 @@ static MagickBooleanType WriteMATImage(const ImageInfo *image_info,Image *image,
     unsigned int
       z;
 
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
-    is_gray=SetImageGray(image,exception);
+    if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+      (void) TransformImageColorspace(image,sRGBColorspace,exception);
+    is_gray=IdentifyImageCoderGray(image,exception);
     z=(is_gray != MagickFalse) ? 0 : 3;
 
     /*

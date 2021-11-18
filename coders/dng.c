@@ -73,7 +73,8 @@
 #if defined(MAGICKCORE_RAW_R_DELEGATE)
 #include <libraw.h>
 #endif
-
+
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -105,9 +106,6 @@
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) && defined(MAGICKCORE_OPENCL_SUPPORT)
 static void InitializeDcrawOpenCL(ExceptionInfo *exception)
 {
-  MagickBooleanType
-    opencl_disabled;
-
   MagickCLDevice
     *devices;
 
@@ -343,6 +341,18 @@ static void SetLibRawParams(const ImageInfo *image_info,Image *image,
       if (raw_info->params.output_color == 5)
         image->colorspace=XYZColorspace;
     }
+  option=GetImageOption(image_info,"dng:interpolation-quality");
+  if (option != (const char *) NULL)
+    {
+      int
+        value;
+
+      value=StringToInteger(option);
+      if (value == -1)
+        raw_info->params.no_interpolation=1;
+      else
+        raw_info->params.user_qual=value;
+    }
 }
 
 static void LibRawDataError(void *data,const char *magick_unused(file),
@@ -359,6 +369,37 @@ static void LibRawDataError(void *data,const char *magick_unused(file),
       (void) ThrowMagickException(exception,GetMagickModule(),
         CorruptImageWarning,"Data corrupted at","`%d'",offset);
   }
+}
+
+static void ReadLibRawThumbnail(const ImageInfo *image_info,Image *image,
+  libraw_data_t *raw_info,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  int
+    errcode;
+
+  libraw_processed_image_t
+    *thumbnail;
+
+  option=GetImageOption(image_info,"dng:read-thumbnail");
+  if (IsStringTrue(option) == MagickFalse)
+    return;
+  errcode=libraw_unpack_thumb(raw_info);
+  if (errcode != LIBRAW_SUCCESS)
+    return;
+  thumbnail=libraw_dcraw_make_mem_thumb(raw_info,&errcode);
+  if (errcode == LIBRAW_SUCCESS)
+    {
+      StringInfo
+        *profile;
+
+      profile=BlobToStringInfo(thumbnail->data,thumbnail->data_size);
+      (void) SetImageProfile(image,"dng:thumbnail",profile,exception);
+    }
+  if (thumbnail != (libraw_processed_image_t *) NULL)
+    libraw_dcraw_clear_mem(thumbnail);
 }
 
 #endif
@@ -447,6 +488,7 @@ static Image *ReadDNGImage(const ImageInfo *image_info,ExceptionInfo *exception)
     image->page.height=raw_info->sizes.raw_height;
     image->page.x=raw_info->sizes.left_margin;
     image->page.y=raw_info->sizes.top_margin;
+    ReadLibRawThumbnail(image_info,image,raw_info,exception);
     if (image_info->ping != MagickFalse)
       {
         libraw_close(raw_info);
@@ -563,7 +605,8 @@ static Image *ReadDNGImage(const ImageInfo *image_info,ExceptionInfo *exception)
   return(InvokeDNGDelegate(image_info,image,exception));
 #endif
 }
-
+
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -746,7 +789,8 @@ ModuleExport size_t RegisterDNGImage(void)
   (void) RegisterMagickInfo(entry);
   return(MagickImageCoderSignature);
 }
-
+
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %

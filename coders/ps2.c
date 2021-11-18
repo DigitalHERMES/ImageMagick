@@ -46,6 +46,7 @@
 #include "MagickCore/cache.h"
 #include "MagickCore/color.h"
 #include "MagickCore/color-private.h"
+#include "MagickCore/colorspace-private.h"
 #include "MagickCore/compress.h"
 #include "MagickCore/constitute.h"
 #include "MagickCore/draw.h"
@@ -70,6 +71,7 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/timer-private.h"
 #include "MagickCore/utility.h"
+#include "coders/coders-private.h"
 
 /*
   Define declarations.
@@ -496,18 +498,20 @@ static MagickBooleanType WritePS2Image(const ImageInfo *image_info,Image *image,
     if ((resolution.x == 0.0) || (resolution.y == 0.0))
       {
         flags=ParseGeometry(PSDensityGeometry,&geometry_info);
-        resolution.x=geometry_info.rho;
-        resolution.y=geometry_info.sigma;
-        if ((flags & SigmaValue) == 0)
-          resolution.y=resolution.x;
+        if ((flags & RhoValue) != 0)
+          resolution.x=geometry_info.rho;
+        resolution.y=resolution.x;
+        if ((flags & SigmaValue) != 0)
+          resolution.y=geometry_info.sigma;
       }
     if (image_info->density != (char *) NULL)
       {
         flags=ParseGeometry(image_info->density,&geometry_info);
-        resolution.x=geometry_info.rho;
-        resolution.y=geometry_info.sigma;
-        if ((flags & SigmaValue) == 0)
-          resolution.y=resolution.x;
+        if ((flags & RhoValue) != 0)
+          resolution.x=geometry_info.rho;
+        resolution.y=resolution.x;
+        if ((flags & SigmaValue) != 0)
+          resolution.y=geometry_info.sigma;
       }
     if (image->units == PixelsPerCentimeterResolution)
       {
@@ -725,7 +729,7 @@ static MagickBooleanType WritePS2Image(const ImageInfo *image_info,Image *image,
       ThrowWriterException(ResourceLimitError,"MemoryAllocationFailed");
     if ((compression == FaxCompression) || (compression == Group4Compression) ||
         ((image_info->type != TrueColorType) &&
-         (SetImageGray(image,exception) != MagickFalse)))
+         (IdentifyImageCoderGray(image,exception) != MagickFalse)))
       {
         (void) FormatLocaleString(buffer,MagickPathExtent,
           "%.20g %.20g\n1\n%d\n",(double) image->columns,(double) image->rows,

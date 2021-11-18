@@ -21,6 +21,9 @@
 #include "MagickCore/memory_.h"
 #include "MagickCore/nt-base.h"
 #include "MagickCore/nt-base-private.h"
+#if defined(MAGICKCORE_HAVE_UTIME_H)
+#include <utime.h>
+#endif
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
@@ -59,7 +62,7 @@ static inline wchar_t *create_wchar_path(const char *utf8)
 {
   int
     count;
- 
+
   wchar_t
     *wideChar;
 
@@ -85,7 +88,8 @@ static inline wchar_t *create_wchar_path(const char *utf8)
       longPath=(wchar_t *) RelinquishMagickMemory(longPath);
       if ((count < 5) || (count >= MAX_PATH))
         return((wchar_t *) NULL);
-      wideChar=(wchar_t *) AcquireQuantumMemory(count-3,sizeof(*wideChar));
+      wideChar=(wchar_t *) AcquireQuantumMemory((size_t) count-3,
+        sizeof(*wideChar));
       wcscpy(wideChar,shortPath+4);
       return(wideChar);
     }
@@ -98,6 +102,31 @@ static inline wchar_t *create_wchar_path(const char *utf8)
       wideChar=(wchar_t *) RelinquishMagickMemory(wideChar);
       return((wchar_t *) NULL);
     }
+  return(wideChar);
+}
+
+static inline wchar_t *create_wchar_mode(const char *mode)
+{
+  int
+    count;
+
+  wchar_t
+    *wideChar;
+
+  count=MultiByteToWideChar(CP_UTF8,0,mode,-1,NULL,0);
+  wideChar=(wchar_t *) AcquireQuantumMemory((size_t) count+1,
+    sizeof(*wideChar));
+  if (wideChar == (wchar_t *) NULL)
+    return((wchar_t *) NULL);
+  count=MultiByteToWideChar(CP_UTF8,0,mode,-1,wideChar,count);
+  if (count == 0)
+    {
+      wideChar=(wchar_t *) RelinquishMagickMemory(wideChar);
+      return((wchar_t *) NULL);
+    }
+  /* Specifies that the file is not inherited by child processes */
+  wideChar[count] = L'\0';
+  wideChar[count-1] = L'N';
   return(wideChar);
 }
 #endif
@@ -137,7 +166,7 @@ static inline FILE *fopen_utf8(const char *path,const char *mode)
    path_wide=create_wchar_path(path);
    if (path_wide == (wchar_t *) NULL)
      return((FILE *) NULL);
-   mode_wide=create_wchar_path(mode);
+   mode_wide=create_wchar_mode(mode);
    if (mode_wide == (wchar_t *) NULL)
      {
        path_wide=(wchar_t *) RelinquishMagickMemory(path_wide);
@@ -177,18 +206,19 @@ static inline int open_utf8(const char *path,int flags,mode_t mode)
 #if !defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__CYGWIN__)
   return(open(path,flags,mode));
 #else
-   int
-     status;
+  int
+    status;
 
-   wchar_t
-     *path_wide;
+  wchar_t
+    *path_wide;
 
-   path_wide=create_wchar_path(path);
-   if (path_wide == (wchar_t *) NULL)
-     return(-1);
-   status=_wopen(path_wide,flags,mode);
-   path_wide=(wchar_t *) RelinquishMagickMemory(path_wide);
-   return(status);
+  path_wide=create_wchar_path(path);
+  if (path_wide == (wchar_t *) NULL)
+    return(-1);
+  /* O_NOINHERIT specifies that the file is not inherited by child processes */
+  status=_wopen(path_wide,flags | O_NOINHERIT,mode);
+  path_wide=(wchar_t *) RelinquishMagickMemory(path_wide);
+  return(status);
 #endif
 }
 
@@ -271,6 +301,74 @@ static inline int rename_utf8(const char *source,const char *destination)
    source_wide=(wchar_t *) RelinquishMagickMemory(source_wide);
    return(status);
 #endif
+}
+
+static inline int set_file_timestamp(const char *path,struct stat *attributes)
+{
+  int
+    status;
+
+#if !defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__CYGWIN__)
+#if defined(MAGICKCORE_HAVE_UTIMENSAT)
+#if defined(__APPLE__) || defined(__NetBSD__) 
+#define st_atim st_atimespec
+#define st_ctim st_ctimespec
+#define st_mtim st_mtimespec
+#endif
+
+  struct timespec
+    timestamp[2];
+
+  timestamp[0]=attributes->st_atim;
+  timestamp[1]=attributes->st_mtim;
+  status=utimensat(AT_FDCWD,path,timestamp,0);
+#else
+  struct utimbuf
+    timestamp;
+
+  timestamp.actime=attributes->st_atime;
+  timestamp.modtime=attributes->st_mtime;
+  status=utime(path,&timestamp);
+#endif
+#else
+  HANDLE
+    handle;
+
+  wchar_t
+    *path_wide;
+
+  status=(-1);
+  path_wide=create_wchar_path(path);
+  if (path_wide == (WCHAR *) NULL)
+    return(status);
+  handle=CreateFileW(path_wide,FILE_WRITE_ATTRIBUTES,FILE_SHARE_WRITE |
+    FILE_SHARE_READ,NULL,OPEN_EXISTING,0,NULL);
+  if (handle != (HANDLE) NULL)
+    {
+      FILETIME
+        creationTime,
+        lastAccessTime,
+        lastWriteTime;
+
+      LONGLONG
+        dateTime;
+
+      dateTime=Int32x32To64(attributes->st_ctime,10000000)+116444736000000000;
+      creationTime.dwLowDateTime=(DWORD) dateTime;
+      creationTime.dwHighDateTime=dateTime>>32;
+      dateTime=Int32x32To64(attributes->st_atime,10000000)+116444736000000000;
+      lastAccessTime.dwLowDateTime=(DWORD) dateTime;
+      lastAccessTime.dwHighDateTime=dateTime>>32;
+      dateTime=Int32x32To64(attributes->st_mtime,10000000)+116444736000000000;
+      lastWriteTime.dwLowDateTime=(DWORD) dateTime;
+      lastWriteTime.dwHighDateTime=dateTime>>32;
+      status=SetFileTime(handle,&creationTime,&lastAccessTime,&lastWriteTime);
+      CloseHandle(handle);
+      status=0;
+    }
+  path_wide=(WCHAR *) RelinquishMagickMemory(path_wide);
+#endif
+  return(status);
 }
 
 static inline int stat_utf8(const char *path,struct stat *attributes)

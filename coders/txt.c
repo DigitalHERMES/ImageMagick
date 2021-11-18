@@ -220,10 +220,11 @@ static Image *ReadTEXTImage(const ImageInfo *image_info,
         flags;
 
       flags=ParseGeometry(PSDensityGeometry,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
     }
   page.width=612;
   page.height=792;
@@ -346,7 +347,7 @@ static Image *ReadTEXTImage(const ImageInfo *image_info,
     }
   (void) AnnotateImage(image,draw_info,exception);
   if (texture != (Image *) NULL)
-    texture=DestroyImage(texture);
+    texture=DestroyImageList(texture);
   draw_info=DestroyDrawInfo(draw_info);
   (void) CloseBlob(image);
   if (status == MagickFalse)
@@ -613,7 +614,7 @@ static Image *ReadTXTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   } while (LocaleNCompare((char *) text,MagickTXTID,strlen(MagickTXTID)) == 0);
   (void) CloseBlob(image);
   if (q == (Quantum *) NULL)
-    return(DestroyImage(image));
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 

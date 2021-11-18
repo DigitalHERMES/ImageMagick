@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         compiler: [ gcc, clang ]
 
@@ -71,8 +71,13 @@ jobs:
         make install
 
   build_windows:
-    name: Build Windows
+    name: Build Windows ${{matrix.platform}}
     runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ Win32, x64 ]
 
     steps:
     - uses: actions/checkout@v2
@@ -98,21 +103,20 @@ jobs:
       run: |
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         cd %GITHUB_WORKSPACE%\ImageMagick-Windows\VisualMagick\configure
-        devenv /upgrade configure.vcxproj
-        msbuild configure.sln /m /t:Rebuild /p:Configuration=Release,Platform=Win32
+        msbuild configure.2019.sln /m /t:Rebuild /p:Configuration=Release,Platform=Win32
 
     - name: Configure ImageMagick
       shell: cmd
       run: |
         cd %GITHUB_WORKSPACE%\ImageMagick-Windows\VisualMagick\configure
-        configure.exe /noWizard /VS2019 /x64 /smtd
+        configure.exe /noWizard /VS2019 /${{matrix.platform}} /smtd
 
     - name: Build ImageMagick
       shell: cmd
       run: |
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         cd %GITHUB_WORKSPACE%\ImageMagick-Windows\VisualMagick
-        msbuild VisualStaticMTD.sln /m /t:Rebuild /p:Configuration=Release,Platform=x64
+        msbuild VisualStaticMTD.sln /m /t:Rebuild /p:Configuration=Release,Platform=${{matrix.platform}}
 
   build_msys2:
     name: Build MSYS2

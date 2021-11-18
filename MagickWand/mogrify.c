@@ -62,9 +62,6 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/timer-private.h"
 #include "MagickCore/utility-private.h"
-#if defined(MAGICKCORE_HAVE_UTIME_H)
-#include <utime.h>
-#endif
 
 /*
   Constant declaration.
@@ -1995,7 +1992,7 @@ WandExport MagickBooleanType MogrifyImage(ImageInfo *image_info,const int argc,
         if (LocaleCompare("kmeans",option+1) == 0)
           {
             /*
-              K-means clustering
+              K-means clustering.
             */
             (void) SyncImageSettings(mogrify_info,*image,exception);
             flags=ParseGeometry(argv[i+1],&geometry_info);
@@ -4070,11 +4067,11 @@ WandExport MagickBooleanType MogrifyImageCommand(ImageInfo *image_info,
         if (*magic != '\0')
           {
             char
-              filename[MagickPathExtent];
+              name[MagickPathExtent];
 
-            (void) FormatLocaleString(filename,MagickPathExtent,"%s:%s",magic,
+            (void) FormatLocaleString(name,MagickPathExtent,"%s:%s",magic,
               image->filename);
-            (void) CopyMagickString(image->filename,filename,MagickPathExtent);
+            (void) CopyMagickString(image->filename,name,MagickPathExtent);
           }
         if ((LocaleCompare(image->filename,"-") != 0) &&
             (IsPathWritable(image->filename) != MagickFalse))
@@ -4110,14 +4107,7 @@ WandExport MagickBooleanType MogrifyImageCommand(ImageInfo *image_info,
               preserve_timestamp=IsStringTrue(GetImageOption(image_info,
                 "preserve-timestamp"));
               if (preserve_timestamp != MagickFalse)
-                {
-                  struct utimbuf
-                    timestamp;
-
-                  timestamp.actime=properties.st_atime;
-                  timestamp.modtime=properties.st_mtime;
-                  (void) utime(image->filename,&timestamp);
-                }
+                (void) set_file_timestamp(image->filename,&properties);
             }
 #endif
             if (*backup_filename != '\0')

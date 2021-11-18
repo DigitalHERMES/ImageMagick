@@ -44,6 +44,7 @@
 #include "MagickCore/blob.h"
 #include "MagickCore/blob-private.h"
 #include "MagickCore/cache.h"
+#include "MagickCore/coder-private.h"
 #include "MagickCore/color.h"
 #include "MagickCore/color-private.h"
 #include "MagickCore/colormap.h"
@@ -70,6 +71,7 @@
 #include "MagickCore/module.h"
 #include "MagickCore/threshold.h"
 #include "MagickCore/utility.h"
+#include "coders/coders-private.h"
 
 /*
   Global declarations.
@@ -718,16 +720,18 @@ static MagickBooleanType WritePICONImage(const ImageInfo *image_info,
   status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
   if (status == MagickFalse)
     return(status);
-  (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   SetGeometry(image,&geometry);
   (void) ParseMetaGeometry(PiconGeometry,&geometry.x,&geometry.y,
     &geometry.width,&geometry.height);
   picon=ResizeImage(image,geometry.width,geometry.height,TriangleFilter,
     exception);
   blob_info=CloneImageInfo(image_info);
+  *blob_info->magick='\0';
   (void) AcquireUniqueFilename(blob_info->filename);
   if ((image_info->type != TrueColorType) &&
-      (SetImageGray(image,exception) != MagickFalse))
+      (IdentifyImageCoderGray(image,exception) != MagickFalse))
     affinity_image=BlobToImage(blob_info,Graymap,GraymapExtent,exception);
   else
     affinity_image=BlobToImage(blob_info,Colormap,ColormapExtent,exception);
@@ -820,7 +824,7 @@ static MagickBooleanType WritePICONImage(const ImageInfo *image_info,
   (void) WriteBlobString(image,"/* XPM */\n");
   GetPathComponent(picon->filename,BasePath,basename);
   (void) FormatLocaleString(buffer,MagickPathExtent,
-    "static char *%.1024s[] = {\n",basename);
+    "static const char *%.1024s[] = {\n",basename);
   (void) WriteBlobString(image,buffer);
   (void) WriteBlobString(image,"/* columns rows colors chars-per-pixel */\n");
   (void) FormatLocaleString(buffer,MagickPathExtent,
@@ -975,7 +979,8 @@ static MagickBooleanType WriteXPMImage(const ImageInfo *image_info,Image *image,
   if (status == MagickFalse)
     return(status);
   if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+    if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+      (void) TransformImageColorspace(image,sRGBColorspace,exception);
   opacity=(-1);
   if (image->alpha_trait == UndefinedPixelTrait)
     {

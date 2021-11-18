@@ -206,11 +206,7 @@ static LinkedListInfo *AcquireDelegateCache(const char *filename,
   LinkedListInfo
     *cache;
 
-  MagickStatusType
-    status;
-
   cache=NewLinkedList(0);
-  status=MagickTrue;
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
     const StringInfo
@@ -223,15 +219,17 @@ static LinkedListInfo *AcquireDelegateCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      status&=LoadDelegateCache(cache,(const char *)
+      (void) LoadDelegateCache(cache,(const char *)
         GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
   }
+#else
+  magick_unreferenced(filename);
 #endif
   if (IsLinkedListEmpty(cache) != MagickFalse)
-    status&=LoadDelegateCache(cache,DelegateMap,"built-in",0,exception);
+    (void) LoadDelegateCache(cache,DelegateMap,"built-in",0,exception);
   return(cache);
 }
 
@@ -1721,14 +1719,16 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   if (image->debug != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   rights=ExecutePolicyRights;
-  if (IsRightsAuthorized(DelegatePolicyDomain,rights,decode) == MagickFalse)
+  if ((decode != (const char *) NULL) &&
+      (IsRightsAuthorized(DelegatePolicyDomain,rights,decode) == MagickFalse))
     {
       errno=EPERM;
       (void) ThrowMagickException(exception,GetMagickModule(),PolicyError,
         "NotAuthorized","`%s'",decode);
       return(MagickFalse);
     }
-  if (IsRightsAuthorized(DelegatePolicyDomain,rights,encode) == MagickFalse)
+  if ((encode != (const char *) NULL) &&
+      (IsRightsAuthorized(DelegatePolicyDomain,rights,encode) == MagickFalse))
     {
       errno=EPERM;
       (void) ThrowMagickException(exception,GetMagickModule(),PolicyError,
@@ -2218,6 +2218,8 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
             (void) SubstituteString((char **) &commands,"&amp;","&");
             (void) SubstituteString((char **) &commands,"&gt;",">");
             (void) SubstituteString((char **) &commands,"&lt;","<");
+            if (delegate_info->commands != (char *) NULL)
+              delegate_info->commands=DestroyString(delegate_info->commands);
             delegate_info->commands=commands;
             break;
           }

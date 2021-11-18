@@ -1,9 +1,121 @@
-2021-06-26  7.1.0-3  <quetzlzacatenango@image...>
-  * Release ImageMagick version 7.1.0-3 GIT revision 18...
+2021-11-15  7.1.0-15  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-15 GIT revision 19...
+
+2021-11-15  7.1.0-15  <quetzlzacatenango@image...>
+  * 
+
+2021-11-13  7.1.0-14  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-14 GIT revision 19349:2ba5cdf42:20211114
+
+2021-11-13  7.1.0-14  <quetzlzacatenango@image...>
+  * Support '#' modifier to aspect ratio geometry (e.g., 3:2#).
+
+2021-11-11  7.1.0-14  Dirk Lemstra <dirk@lem.....org>
+  * The profile of a PSD file will no longer be copied to all the images, only
+    the first returned image will contain the profile. To re-enable the old
+    behavior add -define psd:replicate-profile=true.
+
+2021-10-28  7.1.0-13  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-13 GIT revision 19325:987f36b50:20211028
+
+2021-10-28  7.1.0-13  Dirk Lemstra <dirk@lem.....org>
+  * Fix stack overflow when parsing malicious ps image file (report from
+    Muhammad Aldo Firmansyah).
+
+2021-10-25  7.1.0-12  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-12 GIT revision 19318:113f8f901:20211025
+
+2021-10-15  7.1.0-12  <quetzlzacatenango@image...>
+  * Fix x64 build.
+
+2021-10-24  7.1.0-11  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-11 GIT revision 19313:fbf76f2ef:20211024
+
+2021-10-11  7.1.0-11  <quetzlzacatenango@image...>
+  * Fix connected component abort trap (reference
+    https://github.com/ImageMagick/ImageMagick/issues/4372).
+  * Fix possible unitialized values (reference
+    https://github.com/ImageMagick/ImageMagick/issues/4379).
+  * Fix stack overflow when parsing malicious tiff image file (report from
+    Muhammad Aldo Firmansyah).
+
+2021-10-10  7.1.0-10  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-10 GIT revision 19236:07ebe6b6e:20211010
+
+2021-10-03  7.1.0-10  <quetzlzacatenango@image...>
+  * Improved algorithm for automatic calculation of pointsize for caption and
+    labels.
+  * Support -auto-orient option in the identify utlity.
+
+2021-10-03  7.1.0-9  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-9 GIT revision 19220:7921bf068:20211003
+
+2021-10-03  7.1.0-9  Dirk Lemstra <dirk@lem.....org>
+  * Squash a dump truck load of VisualStudio compiler warnings.
+  * Improved algorithm for automatic calculation of word breaks and pointsize
+    for caption and labels.
+
+2021-09-19  7.1.0-9  <quetzlzacatenango@image...>
+  * Improve wrapping between words and within words (reference
+    https://github.com/ImageMagick/ImageMagick/discussions/4227).
+
+2021-09-18  7.1.0-8  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-8 GIT revision 19115:428fe1921:20210918
+
+2021-09-17  7.1.0-8  Dirk Lemstra <dirk@lem.....org>
+  * Check for `null` in InvokeDelegate() (reference
+    https://github.com/ImageMagick/ImageMagick/issues/4225).
+
+2021-09-12  7.1.0-7  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-7 GIT revision 19095:d368d3c6b:20210912
+
+2021-09-11  7.1.0-7  Dirk Lemstra <dirk@lem.....org>
+  * Fixed incorrect check when module is used as the domain in policy.xml
+    that could allow the use of a disabled module. (reference
+    https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-qvhr-jj4p-j2qr).
+
+2021-09-06  7.1.0-7  <quetzlzacatenango@image...>
+  * Prevent color reduction merging into one color (reference
+    https://github.com/ImageMagick/ImageMagick/issues/4059)
+
+2021-09-04  7.1.0-6  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-6 GIT revision 19033:7c589e780:20210904
+
+2021-08-21  7.1.0-6  <quetzlzacatenango@image...>
+  * Tweak the bilevel image type (reference
+    https://github.com/ImageMagick/ImageMagick/issues/4121).
+  * Converting from LAB to RGB leads to wrong colors (reference
+    https://github.com/ImageMagick/ImageMagick/issues/4105).
+
+2021-08-21  7.1.0-5  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-5 GIT revision 18995:8f77c3c9c:20210821
+
+2021-08-12  7.1.0-5  Dirk Lemstra <dirk@lem.....org>
+  * Added option (-dng:read-thumbnail=true) to read the thumbnail of a raw
+    Image and store it as a profile called dng:thumbnail.
+
+2021-07-26  7.1.0-5  <quetzlzacatenango@image...>
+  * Heap-based buffer overflow in TIFF coder (alert from Hunter Mitchell).
+  * Grayscale image write optimization.
+
+2021-07-18  7.1.0-4  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-4 GIT revision 18926:8eb9c6c48:20210718
+
+2021-07-17  7.1.0-4  <quetzlzacatenango@image...>
+  * Trim no longer returns an empty image on 1-pixel width input (reference
+    https://github.com/ImageMagick/ImageMagick/issues/3896).
+  * remove virtual canvas offset from difference image.
+
+2021-07-17  7.1.0-3  <quetzlzacatenango@image...>
+  * Release ImageMagick version 7.1.0-3 GIT revision 18901:692e6e059:20210717
+
+2021-07-03  7.1.0-3  Dirk Lemstra <dirk@lem.....org>
+  * Added option to set the pixel format option of ffmpeg when reading or
+    writing a video file with -define video:pixel-format=<value>.
 
 2021-06-26  7.1.0-3  <quetzlzacatenango@image...>
   * system() is not supported under IOS.
-  * accelerate subimage-search with FFT's (contributed by Fred).
+  * Accelerate subimage-search with FFT's (contributed by Fred).
 
 2021-06-25  7.1.0-2  <quetzlzacatenango@image...>
   * Release ImageMagick version 7.1.0-2 GIT revision 18831:601356f1d:20210625
@@ -15,9 +127,9 @@
 2021-06-20  7.1.0-1  <quetzlzacatenango@image...>
   * Release ImageMagick version 7.1.0-1 GIT revision 18826:1f1b43ea7:20210620
 
-2021-06-19  7.1.0-1  <quetzlzacatenango@image...>
-  * Correct TGA orientation (reference
-    https://github.com/ImageMagick/ImageMagick/issues/3844).
+2021-06-19  7.1.0-1  Dirk Lemstra <dirk@lem.....org>
+  * Added option to set the vsync option of ffmpeg when reading or writing a
+    video file with -define video:vsync=<value>.
 
 2021-06-12  7.1.0-0  <quetzlzacatenango@image...>
   * Release ImageMagick version 7.1.0-0 GIT revision 18806:d64f1bb3a:20210612

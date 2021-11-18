@@ -86,6 +86,7 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/xml-tree-private.h"
 #include "coders/bytebuffer-private.h"
+#include "coders/coders-private.h"
 #include "coders/ghostscript-private.h"
 
 /*
@@ -202,7 +203,8 @@ static void ReadPDFInfo(const ImageInfo *image_info,Image *image,
     version[MagickPathExtent];
 
   int
-    c;
+    c,
+    percent_count;
 
   MagickByteBuffer
     buffer;
@@ -230,13 +232,12 @@ static void ReadPDFInfo(const ImageInfo *image_info,Image *image,
   pdf_info->trimbox=IsStringTrue(GetImageOption(image_info,"pdf:use-trimbox"));
   *version='\0';
   spotcolor=0;
+  percent_count=0;
   (void) memset(&buffer,0,sizeof(buffer));
   buffer.image=image;
   for (c=ReadMagickByteBuffer(&buffer); c != EOF; c=ReadMagickByteBuffer(&buffer))
   {
-    switch(c)
-    {
-      case '%':
+    if (c == '%')
       {
         if (*version == '\0')
           {
@@ -248,19 +249,32 @@ static void ReadPDFInfo(const ImageInfo *image_info,Image *image,
               version[i++]=(char) c;
             }
             version[i]='\0';
+            if (c == EOF)
+              break;
           }
-        continue;
+        if (++percent_count == 2)
+          percent_count=0;
+        else
+          continue;
       }
-      case '<':
+    else
       {
-        ReadGhostScriptXMPProfile(&buffer,&pdf_info->profile);
-        continue;
+        percent_count=0;
+        switch(c)
+        {
+          case '<':
+          {
+            ReadGhostScriptXMPProfile(&buffer,&pdf_info->profile);
+            continue;
+          }
+          case '/':
+            break;
+          default:
+            continue;
+        }
       }
-      case '/':
-        break;
-      default:
-        continue;
-    }
+    if (c == EOF)
+      break;
     if (CompareMagickByteBuffer(&buffer,PDFRotate,strlen(PDFRotate)) != MagickFalse)
       {
         p=GetMagickByteBufferDatum(&buffer);
@@ -296,6 +310,8 @@ static void ReadPDFInfo(const ImageInfo *image_info,Image *image,
             break;
           name[i++]=(char) c;
         }
+        if (c == EOF)
+          break;
         name[i]='\0';
         value=ConstantString(name);
         (void) SubstituteString(&value,"#20"," ");
@@ -455,18 +471,20 @@ static Image *ReadPDFImage(const ImageInfo *image_info,ExceptionInfo *exception)
   if ((image->resolution.x == 0.0) || (image->resolution.y == 0.0))
     {
       flags=ParseGeometry(PSDensityGeometry,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
     }
   if (image_info->density != (char *) NULL)
     {
       flags=ParseGeometry(image_info->density,&geometry_info);
-      image->resolution.x=geometry_info.rho;
-      image->resolution.y=geometry_info.sigma;
-      if ((flags & SigmaValue) == 0)
-        image->resolution.y=image->resolution.x;
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
     }
   (void) ParseAbsoluteGeometry(PSPageGeometry,&page);
   if (image_info->page != (char *) NULL)
@@ -582,6 +600,7 @@ static Image *ReadPDFImage(const ImageInfo *image_info,ExceptionInfo *exception)
     if ((image_info->page != (char *) NULL) || (fitPage != MagickFalse))
       (void) FormatLocaleString(options,MagickPathExtent,"-g%.20gx%.20g ",
         (double) page.width,(double) page.height);
+  (void) ConcatenateMagickString(options,"-dPrinted=false ",MagickPathExtent);
   if (fitPage != MagickFalse)
     (void) ConcatenateMagickString(options,"-dPSFitPage ",MagickPathExtent);
   if (pdf_info.cropbox != MagickFalse)
@@ -656,19 +675,37 @@ static Image *ReadPDFImage(const ImageInfo *image_info,ExceptionInfo *exception)
       (void) RelinquishUniqueFileResource(read_info->filename);
     }
   else
-    for (i=1; ; i++)
     {
-      (void) InterpretImageFilename(image_info,image,filename,(int) i,
-        read_info->filename,exception);
-      if (IsGhostscriptRendered(read_info->filename) == MagickFalse)
-        break;
-      read_info->blob=NULL;
-      read_info->length=0;
-      next=ReadImage(read_info,exception);
-      (void) RelinquishUniqueFileResource(read_info->filename);
+      next=(Image *) NULL;
+      for (i=1; ; i++)
+      {
+        (void) InterpretImageFilename(image_info,image,filename,(int) i,
+          read_info->filename,exception);
+        if (IsGhostscriptRendered(read_info->filename) == MagickFalse)
+          break;
+        read_info->blob=NULL;
+        read_info->length=0;
+        next=ReadImage(read_info,exception);
+        (void) RelinquishUniqueFileResource(read_info->filename);
+        if (next == (Image *) NULL)
+          break;
+        AppendImageToList(&pdf_image,next);
+      }
+      /* Clean up remaining files */
       if (next == (Image *) NULL)
-        break;
-      AppendImageToList(&pdf_image,next);
+        {
+          ssize_t
+            j;
+
+          for (j=i+1; ; j++)
+            {
+              (void) InterpretImageFilename(image_info,image,filename,(int) j,
+                read_info->filename,exception);
+              if (IsGhostscriptRendered(read_info->filename) == MagickFalse)
+                break;
+              (void) RelinquishUniqueFileResource(read_info->filename);
+            }
+        }
     }
   read_info=DestroyImageInfo(read_info);
   if (pdf_image == (Image *) NULL)
@@ -1196,7 +1233,7 @@ static const char *GetPDFTitle(const ImageInfo *image_info,
   return(default_title);
 }
 
-static const StringInfo* GetCompatibleColorProfile(const Image* image)
+static const StringInfo *GetCompatibleColorProfile(const Image* image)
 {
   ColorspaceType
     colorspace;
@@ -1428,7 +1465,9 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
     version=1.6;
   for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
   {
-    (void) SetImageGray(next,exception);
+    if ((image_info->type != TrueColorType) &&
+        (IdentifyImageCoderGray(next,exception) != MagickFalse))
+      SetImageColorspace(next,GRAYColorspace,exception);
     icc_profile=GetCompatibleColorProfile(next);
     if (icc_profile != (StringInfo *) NULL)
       {
@@ -1647,6 +1686,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
         break;
     }
     if (compression == JPEG2000Compression)
+      if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
       (void) TransformImageColorspace(image,sRGBColorspace,exception);
     /*
       Scale relative to dots-per-inch.
@@ -1658,18 +1698,20 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
     if ((resolution.x == 0.0) || (resolution.y == 0.0))
       {
         flags=ParseGeometry(PSDensityGeometry,&geometry_info);
-        resolution.x=geometry_info.rho;
-        resolution.y=geometry_info.sigma;
-        if ((flags & SigmaValue) == 0)
-          resolution.y=resolution.x;
+        if ((flags & RhoValue) != 0)
+          resolution.x=geometry_info.rho;
+        resolution.y=resolution.x;
+        if ((flags & SigmaValue) != 0)
+          resolution.y=geometry_info.sigma;
       }
     if (image_info->density != (char *) NULL)
       {
         flags=ParseGeometry(image_info->density,&geometry_info);
-        resolution.x=geometry_info.rho;
-        resolution.y=geometry_info.sigma;
-        if ((flags & SigmaValue) == 0)
-          resolution.y=resolution.x;
+        if ((flags & RhoValue) != 0)
+          resolution.x=geometry_info.rho;
+        resolution.y=resolution.x;
+        if ((flags & SigmaValue) != 0)
+          resolution.y=geometry_info.sigma;
       }
     if (image->units == PixelsPerCentimeterResolution)
       {
@@ -1954,8 +1996,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
     if ((4*number_pixels) != (MagickSizeType) ((size_t) (4*number_pixels)))
       ThrowPDFException(ResourceLimitError,"MemoryAllocationFailed");
     if ((compression == FaxCompression) || (compression == Group4Compression) ||
-        ((image_info->type != TrueColorType) &&
-         (SetImageGray(image,exception) != MagickFalse)))
+        (IsImageGray(image) != MagickFalse))
       {
         switch (compression)
         {
@@ -2318,8 +2359,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
     else
       if ((compression == FaxCompression) ||
           (compression == Group4Compression) ||
-          ((image_info->type != TrueColorType) &&
-           (SetImageGray(image,exception) != MagickFalse)))
+          (IsImageGray(image) != MagickFalse))
         {
           device="DeviceGray";
           channels=1;
@@ -2345,7 +2385,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
     else
       {
         const unsigned char
-          *p;
+          *r;
 
         /*
           Write ICC profile.
@@ -2364,9 +2404,9 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
         (void) WriteBlobString(image,buffer);
         offset=TellBlob(image);
         Ascii85Initialize(image);
-        p=GetStringInfoDatum(icc_profile);
+        r=GetStringInfoDatum(icc_profile);
         for (i=0; i < (ssize_t) GetStringInfoLength(icc_profile); i++)
-          Ascii85Encode(image,(unsigned char) *p++);
+          Ascii85Encode(image,(unsigned char) *r++);
         Ascii85Flush(image);
         offset=TellBlob(image)-offset;
         (void) WriteBlobString(image,"endstream\n");
@@ -2395,7 +2435,11 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
         &geometry.width,&geometry.height);
     tile_image=ThumbnailImage(image,geometry.width,geometry.height,exception);
     if (tile_image == (Image *) NULL)
-      return(MagickFalse);
+      {
+        xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
+        (void) CloseBlob(image);
+        return(MagickFalse);
+      }
     xref[object++]=TellBlob(image);
     (void) FormatLocaleString(buffer,MagickPathExtent,"%.20g 0 obj\n",(double)
       object);
@@ -2482,8 +2526,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
     number_pixels=(MagickSizeType) tile_image->columns*tile_image->rows;
     if ((compression == FaxCompression) ||
         (compression == Group4Compression) ||
-        ((image_info->type != TrueColorType) &&
-         (SetImageGray(tile_image,exception) != MagickFalse)))
+        (IsImageGray(image) != MagickFalse))
       {
         switch (compression)
         {
@@ -2505,6 +2548,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
               exception);
             if (status == MagickFalse)
               {
+                tile_image=DestroyImage(tile_image);
                 xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                 (void) CloseBlob(image);
                 return(MagickFalse);
@@ -2516,6 +2560,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
             status=InjectImageBlob(image_info,image,tile_image,"jp2",exception);
             if (status == MagickFalse)
               {
+                tile_image=DestroyImage(tile_image);
                 xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                 (void) CloseBlob(image);
                 return(MagickFalse);
@@ -2568,6 +2613,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
             pixel_info=RelinquishVirtualMemory(pixel_info);
             if (status == MagickFalse)
               {
+                tile_image=DestroyImage(tile_image);
                 xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                 (void) CloseBlob(image);
                 return(MagickFalse);
@@ -2610,6 +2656,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
               exception);
             if (status == MagickFalse)
               {
+                tile_image=DestroyImage(tile_image);
                 xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                 (void) CloseBlob(image);
                 return(MagickFalse);
@@ -2621,6 +2668,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
             status=InjectImageBlob(image_info,image,tile_image,"jp2",exception);
             if (status == MagickFalse)
               {
+                tile_image=DestroyImage(tile_image);
                 xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                 (void) CloseBlob(image);
                 return(MagickFalse);
@@ -2677,6 +2725,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
             pixel_info=RelinquishVirtualMemory(pixel_info);
             if (status == MagickFalse)
               {
+                tile_image=DestroyImage(tile_image);
                 xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                 (void) CloseBlob(image);
                 return(MagickFalse);
@@ -2766,6 +2815,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
               pixel_info=RelinquishVirtualMemory(pixel_info);
               if (status == MagickFalse)
                 {
+                  tile_image=DestroyImage(tile_image);
                   xref=(MagickOffsetType *) RelinquishMagickMemory(xref);
                   (void) CloseBlob(image);
                   return(MagickFalse);
@@ -3072,7 +3122,7 @@ static MagickBooleanType WritePDFImage(const ImageInfo *image_info,Image *image,
           hex_digits[13]='D';
           hex_digits[14]='E';
           hex_digits[15]='F';
-          (void) FormatLocaleString(buffer,MagickPathExtent,"/Title <");
+          (void) FormatLocaleString(buffer,MagickPathExtent,"/Title <FEFF");
           (void) WriteBlobString(image,buffer);
           for (i=0; i < (ssize_t) length; i++)
           {

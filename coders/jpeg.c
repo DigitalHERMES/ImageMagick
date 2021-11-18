@@ -85,6 +85,7 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/xml-tree.h"
 #include "MagickCore/xml-tree-private.h"
+#include "coders/coders-private.h"
 #include <setjmp.h>
 #if defined(MAGICKCORE_JPEG_DELEGATE)
 #define JPEG_INTERNAL_OPTIONS
@@ -340,8 +341,8 @@ static void JPEGErrorHandler(j_common_ptr jpeg_info)
     (void) LogMagickEvent(CoderEvent,GetMagickModule(),
       "[%s] JPEG Trace: \"%s\"",image->filename,message);
   if (client_info->finished != MagickFalse)
-    (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageWarning,
-      (char *) message,"`%s'",image->filename);
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      CorruptImageWarning,(char *) message,"`%s'",image->filename);
   else
     (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageError,
       (char *) message,"`%s'",image->filename);
@@ -371,7 +372,7 @@ static void JPEGProgressHandler(j_common_ptr jpeg_info)
   longjmp(client_info->error_recovery,1);
 }
 
-static MagickBooleanType JPEGWarningHandler(j_common_ptr jpeg_info,int level)
+static void JPEGWarningHandler(j_common_ptr jpeg_info,int level)
 {
 #define JPEGExcessiveWarnings  1000
 
@@ -398,8 +399,8 @@ static MagickBooleanType JPEGWarningHandler(j_common_ptr jpeg_info,int level)
       */
       (jpeg_info->err->format_message)(jpeg_info,message);
       if (jpeg_info->err->num_warnings++ < JPEGExcessiveWarnings)
-        ThrowBinaryException(CorruptImageWarning,(char *) message,
-          image->filename);
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          CorruptImageWarning,message,"`%s'",image->filename);
     }
   else
     if (level >= jpeg_info->err->trace_level)
@@ -412,7 +413,6 @@ static MagickBooleanType JPEGWarningHandler(j_common_ptr jpeg_info,int level)
           (void) LogMagickEvent(CoderEvent,GetMagickModule(),
             "[%s] JPEG Trace: \"%s\"",image->filename,message);
       }
-  return(MagickTrue);
 }
 
 static boolean ReadProfileData(j_decompress_ptr jpeg_info,const size_t index,
@@ -2334,14 +2334,11 @@ static MagickBooleanType WriteJPEGImage_(const ImageInfo *image_info,
     }
     default:
     {
-      ImageType
-        type;
-
-      (void) TransformImageColorspace(image,sRGBColorspace,exception);
+      if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+        (void) TransformImageColorspace(image,sRGBColorspace,exception);
       if (image_info->type == TrueColorType)
         break;
-      type=IdentifyImageType(image,exception);
-      if ((type == GrayscaleType) || (type == BilevelType))
+      if (IdentifyImageCoderGray(image,exception) != MagickFalse)
         {
           jpeg_info->input_components=1;
           jpeg_info->in_color_space=JCS_GRAYSCALE;
@@ -2702,30 +2699,9 @@ static MagickBooleanType WriteJPEGImage_(const ImageInfo *image_info,
           "Number of colors: unspecified");
       (void) LogMagickEvent(CoderEvent,GetMagickModule(),
         "JPEG data precision: %d",(int) jpeg_info->data_precision);
-      switch (image->colorspace)
+      switch (jpeg_info->in_color_space)
       {
-        case CMYKColorspace:
-        {
-          (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-            "Storage class: DirectClass");
-          (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-            "Colorspace: CMYK");
-          break;
-        }
-        case YCbCrColorspace:
-        case Rec601YCbCrColorspace:
-        case Rec709YCbCrColorspace:
-        {
-          (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-            "Colorspace: YCbCr");
-          break;
-        }
-        default:
-          break;
-      }
-      switch (image->colorspace)
-      {
-        case CMYKColorspace:
+        case JCS_CMYK:
         {
           (void) LogMagickEvent(CoderEvent,GetMagickModule(),
             "Colorspace: CMYK");
@@ -2741,7 +2717,7 @@ static MagickBooleanType WriteJPEGImage_(const ImageInfo *image_info,
             jpeg_info->comp_info[3].v_samp_factor);
           break;
         }
-        case GRAYColorspace:
+        case JCS_GRAYSCALE:
         {
           (void) LogMagickEvent(CoderEvent,GetMagickModule(),
             "Colorspace: GRAY");
@@ -2750,11 +2726,10 @@ static MagickBooleanType WriteJPEGImage_(const ImageInfo *image_info,
             jpeg_info->comp_info[0].v_samp_factor);
           break;
         }
-        case sRGBColorspace:
-        case RGBColorspace:
+        case JCS_UNKNOWN:
         {
           (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-            "Image colorspace is RGB");
+            "Colorspace: RGB");
           (void) LogMagickEvent(CoderEvent,GetMagickModule(),
             "Sampling factors: %dx%d,%dx%d,%dx%d",
             jpeg_info->comp_info[0].h_samp_factor,
@@ -2765,9 +2740,7 @@ static MagickBooleanType WriteJPEGImage_(const ImageInfo *image_info,
             jpeg_info->comp_info[2].v_samp_factor);
           break;
         }
-        case YCbCrColorspace:
-        case Rec601YCbCrColorspace:
-        case Rec709YCbCrColorspace:
+        case JCS_YCbCr:
         {
           (void) LogMagickEvent(CoderEvent,GetMagickModule(),
             "Colorspace: YCbCr");
@@ -2781,22 +2754,7 @@ static MagickBooleanType WriteJPEGImage_(const ImageInfo *image_info,
             jpeg_info->comp_info[2].v_samp_factor);
           break;
         }
-        default:
-        {
-          (void) LogMagickEvent(CoderEvent,GetMagickModule(),"Colorspace: %d",
-            image->colorspace);
-          (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-            "Sampling factors: %dx%d,%dx%d,%dx%d,%dx%d",
-            jpeg_info->comp_info[0].h_samp_factor,
-            jpeg_info->comp_info[0].v_samp_factor,
-            jpeg_info->comp_info[1].h_samp_factor,
-            jpeg_info->comp_info[1].v_samp_factor,
-            jpeg_info->comp_info[2].h_samp_factor,
-            jpeg_info->comp_info[2].v_samp_factor,
-            jpeg_info->comp_info[3].h_samp_factor,
-            jpeg_info->comp_info[3].v_samp_factor);
-          break;
-        }
+        default: break;
       }
     }
   /*

@@ -356,6 +356,8 @@ static Image *ReadJXLImage(const ImageInfo *image_info,ExceptionInfo *exception)
         decoder_status=JxlDecoderGetColorAsICCProfile(decoder,&format,
           JXL_COLOR_PROFILE_TARGET_ORIGINAL,GetStringInfoDatum(profile),
           profile_size);
+        (void) SetImageProfile(image,"icc",profile,exception);
+        DestroyStringInfo(profile);
         if (decoder_status == JXL_DEC_SUCCESS)
           decoder_status=JXL_DEC_COLOR_ENCODING;
         break;
@@ -519,6 +521,23 @@ ModuleExport void UnregisterJXLImage(void)
 %    o image:  The image.
 %
 */
+
+static JxlEncoderStatus JXLWriteMetadata(const Image *image,
+  JxlEncoder *encoder)
+{
+  JxlColorEncoding
+    color_encoding;
+
+  JxlEncoderStatus
+    encoder_status;
+
+  memset(&color_encoding,0,sizeof(color_encoding));
+  JxlColorEncodingSetToSRGB(&color_encoding,
+    IsImageGray(image) == MagickTrue ? JXL_TRUE : JXL_FALSE);
+  encoder_status=JxlEncoderSetColorEncoding(encoder,&color_encoding);
+  return(encoder_status);
+}
+
 static MagickBooleanType WriteJXLImage(const ImageInfo *image_info,Image *image,
   ExceptionInfo *exception)
 {
@@ -593,7 +612,7 @@ static MagickBooleanType WriteJXLImage(const ImageInfo *image_info,Image *image,
     }
   memset(&format,0,sizeof(format));
   JXLSetFormat(image,&format);
-  memset(&basic_info,0,sizeof(basic_info));
+  JxlEncoderInitBasicInfo(&basic_info);
   basic_info.xsize=(uint32_t) image->columns;
   basic_info.ysize=(uint32_t) image->rows;
   basic_info.bits_per_sample=8;
@@ -627,14 +646,22 @@ static MagickBooleanType WriteJXLImage(const ImageInfo *image_info,Image *image,
       float
         distance;
 
-      distance=(image_info->quality >= 30) ? 0.1f+(100-MagickMin(100,
-        image_info->quality))*0.09f : 6.4f+pow(2.5f,(30-image_info->quality)/
-        5.0f)/6.25f;
+      distance=(image_info->quality >= 30) ? 0.1f+(float) (100-MagickMin(100,
+        image_info->quality))*0.09f : 6.4f+(float) pow(2.5f,(30-
+        image_info->quality)/5.0f)/6.25f;
       JxlEncoderOptionsSetDistance(encoder_options,distance);
     }
   option=GetImageOption(image_info,"jxl:effort");
   if (option != (const char *) NULL)
     JxlEncoderOptionsSetEffort(encoder_options,StringToInteger(option));
+  encoder_status=JXLWriteMetadata(image,encoder);
+  encoder_status=JXL_ENC_SUCCESS;
+  if (encoder_status != JXL_ENC_SUCCESS)
+    {
+      JxlThreadParallelRunnerDestroy(runner);
+      JxlEncoderDestroy(encoder);
+      ThrowWriterException(CoderError,"UnableToWriteImageData");
+    }
   bytes_per_row=image->columns*
     ((image->alpha_trait == BlendPixelTrait) ? 4 : 3)*
     ((format.data_type == JXL_TYPE_FLOAT) ? sizeof(float) :
